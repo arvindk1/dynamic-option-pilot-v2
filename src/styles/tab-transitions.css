@@ -1,0 +1,68 @@
+/* Tab Content Transition Animations */
+.tab-content-enter {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.tab-content-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 200ms ease-out, transform 200ms ease-out;
+}
+
+.tab-content-exit {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.tab-content-exit-active {
+  opacity: 0;
+  transform: translateY(-10px);
+  transition: opacity 150ms ease-in, transform 150ms ease-in;
+}
+
+/* Tab Trigger Hover Effects */
+.tab-trigger {
+  transition: all 150ms ease-in-out;
+}
+
+.tab-trigger:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Loading State Animations */
+.tab-loading-skeleton {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Performance Optimization - Hardware Acceleration */
+.tab-content-wrapper {
+  will-change: transform, opacity;
+  transform: translateZ(0);
+}
+
+/* Smooth tab switching */
+[data-state="active"] {
+  animation: fadeInUp 0.2s ease-out;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

@@ -1,0 +1,64 @@
+# Development environment configuration
+database:
+  url: "sqlite:///./dev.db"
+  echo: true
+
+data_providers:
+  primary_provider: "yfinance_provider"
+  fallback_providers: []
+  cache_enabled: true
+  rate_limit_ms: 100
+
+trading:
+  paper_trading: true
+  max_position_size: 1000.0
+  max_portfolio_risk: 0.02
+  default_universe:
+    - "SPY"
+    - "QQQ"
+    - "IWM"
+    - "AAPL"
+    - "MSFT"
+    - "GOOGL"
+    - "AMZN"
+    - "TSLA"
+
+analysis:
+  rsi_period: 14
+  ema_fast: 12
+  ema_slow: 26
+  macd_signal: 9
+  atr_period: 14
+  volatility_threshold: 0.75
+
+api:
+  host: "0.0.0.0"
+  port: 8000
+  debug: true
+  cors_origins:
+    - "*"
+
+logging:
+  level: "DEBUG"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file_path: "logs/development.log"
+
+plugins:
+  yfinance_provider:
+    cache_enabled: true
+    rate_limit_ms: 100
+  
+  alpaca_provider:
+    paper_trading: true
+    # API keys should be set via environment variables:
+    # ALPACA_API_KEY and ALPACA_SECRET_KEY
+  
+  technical_analyzer:
+    rsi_period: 14
+    ema_fast: 12
+    ema_slow: 26
+    macd_signal: 9
+    atr_period: 14
+    bb_period: 20
+    bb_std_dev: 2.0
+    high_vol_threshold: 0.75

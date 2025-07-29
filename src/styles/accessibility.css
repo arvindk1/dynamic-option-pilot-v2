@@ -1,0 +1,419 @@
+/* Accessibility Enhancement Styles */
+
+/* Screen Reader Only Content */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Skip to content link */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 6px;
+  background: #000;
+  color: #fff;
+  padding: 8px;
+  text-decoration: none;
+  z-index: 100;
+  border-radius: 4px;
+}
+
+.skip-link:focus {
+  top: 6px;
+}
+
+/* High Contrast Mode */
+.high-contrast {
+  --background: #000000;
+  --foreground: #ffffff;
+  --card: #111111;
+  --card-foreground: #ffffff;
+  --primary: #ffffff;
+  --primary-foreground: #000000;
+  --secondary: #333333;
+  --secondary-foreground: #ffffff;
+  --muted: #222222;
+  --muted-foreground: #cccccc;
+  --accent: #333333;
+  --accent-foreground: #ffffff;
+  --destructive: #ff0000;
+  --destructive-foreground: #ffffff;
+  --border: #444444;
+  --input: #222222;
+  --ring: #ffffff;
+  --success: #00ff00;
+  --warning: #ffff00;
+  --info: #00ffff;
+}
+
+.high-contrast .trading-card {
+  border: 2px solid #ffffff !important;
+  background: #000000 !important;
+}
+
+.high-contrast .trading-card:hover {
+  border-color: #ffff00 !important;
+}
+
+.high-contrast .bg-green-50 {
+  background-color: #003300 !important;
+}
+
+.high-contrast .bg-blue-50 {
+  background-color: #000033 !important;
+}
+
+.high-contrast .bg-red-50 {
+  background-color: #330000 !important;
+}
+
+.high-contrast .text-green-700 {
+  color: #00ff00 !important;
+}
+
+.high-contrast .text-blue-700 {
+  color: #0099ff !important;
+}
+
+.high-contrast .text-red-700 {
+  color: #ff0000 !important;
+}
+
+/* Large Text Mode */
+.large-text {
+  font-size: 1.125rem;
+}
+
+.large-text .text-xs {
+  font-size: 0.875rem;
+}
+
+.large-text .text-sm {
+  font-size: 1rem;
+}
+
+.large-text .text-base {
+  font-size: 1.25rem;
+}
+
+.large-text .text-lg {
+  font-size: 1.5rem;
+}
+
+.large-text .text-xl {
+  font-size: 1.875rem;
+}
+
+.large-text .text-2xl {
+  font-size: 2.25rem;
+}
+
+/* Reduced Motion */
+.reduced-motion *,
+.reduced-motion *::before,
+.reduced-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+.reduced-motion .animate-spin {
+  animation: none !important;
+}
+
+.reduced-motion .animate-pulse {
+  animation: none !important;
+}
+
+/* Enhanced Focus Indicators */
+.focus-visible *:focus {
+  outline: 2px solid #0066cc !important;
+  outline-offset: 2px !important;
+}
+
+.focus-visible button:focus,
+.focus-visible [role="button"]:focus {
+  outline: 3px solid #0066cc !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 1px #ffffff, 0 0 0 4px #0066cc !important;
+}
+
+.focus-visible input:focus,
+.focus-visible textarea:focus,
+.focus-visible select:focus {
+  outline: 2px solid #0066cc !important;
+  outline-offset: 1px !important;
+  border-color: #0066cc !important;
+}
+
+.focus-visible [role="tab"]:focus {
+  outline: 2px solid #0066cc !important;
+  outline-offset: -2px !important;
+  background-color: rgba(0, 102, 204, 0.1) !important;
+}
+
+.focus-visible [role="tabpanel"] {
+  outline: none;
+}
+
+/* High contrast focus indicators */
+.high-contrast.focus-visible *:focus {
+  outline: 3px solid #ffff00 !important;
+  outline-offset: 2px !important;
+}
+
+.high-contrast.focus-visible button:focus,
+.high-contrast.focus-visible [role="button"]:focus {
+  outline: 3px solid #ffff00 !important;
+  box-shadow: 0 0 0 1px #000000, 0 0 0 5px #ffff00 !important;
+}
+
+/* Keyboard Navigation Helper */
+.keyboard-user *:focus {
+  outline: 2px solid #0066cc;
+  outline-offset: 2px;
+}
+
+.keyboard-user button:focus {
+  outline: 3px solid #0066cc;
+  outline-offset: 2px;
+}
+
+/* Trading Card Accessibility */
+.trading-card:focus-within {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.reduced-motion .trading-card:focus-within {
+  transform: none;
+  box-shadow: 0 0 0 2px #0066cc;
+}
+
+/* Tab Navigation */
+[role="tablist"] {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+}
+
+[role="tab"] {
+  position: relative;
+  padding: 12px 16px;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  color: var(--muted-foreground);
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+[role="tab"]:hover {
+  color: var(--foreground);
+  background-color: var(--muted);
+}
+
+[role="tab"][aria-selected="true"] {
+  color: var(--foreground);
+  border-bottom: 2px solid var(--primary);
+}
+
+[role="tab"][aria-selected="true"]::after {
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--primary);
+}
+
+/* Button States */
+button:disabled,
+[role="button"][aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Form Controls */
+input[aria-invalid="true"],
+textarea[aria-invalid="true"],
+select[aria-invalid="true"] {
+  border-color: var(--destructive) !important;
+  box-shadow: 0 0 0 1px var(--destructive) !important;
+}
+
+/* Loading States */
+[aria-busy="true"] {
+  cursor: wait;
+}
+
+/* Status Messages */
+.status-message {
+  padding: 12px;
+  border-radius: 6px;
+  margin: 16px 0;
+}
+
+.status-message.success {
+  background-color: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.status-message.error {
+  background-color: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+
+.status-message.warning {
+  background-color: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffeaa7;
+}
+
+.status-message.info {
+  background-color: #cce7ff;
+  color: #004085;
+  border: 1px solid #b3d7ff;
+}
+
+.high-contrast .status-message.success {
+  background-color: #003300;
+  color: #00ff00;
+  border: 2px solid #00ff00;
+}
+
+.high-contrast .status-message.error {
+  background-color: #330000;
+  color: #ff0000;
+  border: 2px solid #ff0000;
+}
+
+.high-contrast .status-message.warning {
+  background-color: #333300;
+  color: #ffff00;
+  border: 2px solid #ffff00;
+}
+
+.high-contrast .status-message.info {
+  background-color: #003333;
+  color: #00ffff;
+  border: 2px solid #00ffff;
+}
+
+/* Progress Indicators */
+.progress-bar {
+  background-color: var(--muted);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background-color: var(--primary);
+  transition: width 0.3s ease;
+}
+
+.reduced-motion .progress-fill {
+  transition: none;
+}
+
+/* Tooltip Accessibility */
+[role="tooltip"] {
+  background: var(--popover);
+  color: var(--popover-foreground);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 0.875rem;
+  max-width: 300px;
+  z-index: 50;
+}
+
+.high-contrast [role="tooltip"] {
+  background: #000000;
+  color: #ffffff;
+  border: 2px solid #ffffff;
+}
+
+/* Modal and Dialog Accessibility */
+[role="dialog"] {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  z-index: 50;
+}
+
+.high-contrast [role="dialog"] {
+  border: 3px solid #ffffff;
+  box-shadow: 0 0 20px #ffffff;
+}
+
+/* Data Table Accessibility */
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+th, td {
+  text-align: left;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+th {
+  background-color: var(--muted);
+  font-weight: 600;
+}
+
+.high-contrast th {
+  background-color: #222222;
+  border: 1px solid #ffffff;
+}
+
+.high-contrast td {
+  border: 1px solid #666666;
+}
+
+/* Interactive Elements */
+.interactive:hover {
+  background-color: var(--accent);
+  cursor: pointer;
+}
+
+.interactive:focus {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* Responsive Text Scaling */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media (prefers-contrast: high) {
+  :root {
+    --background: #000000;
+    --foreground: #ffffff;
+    --border: #ffffff;
+  }
+}
