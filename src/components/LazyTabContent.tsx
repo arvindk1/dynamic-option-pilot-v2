@@ -108,6 +108,6 @@ export const LazyTradeManager = lazy(() =>
 
 export const LazyMarketCommentary = lazy(() => 
   import('@/components/MarketCommentary').then(module => ({
-    default: module.default
+    default: module.MarketCommentary || module.default
   }))
 );

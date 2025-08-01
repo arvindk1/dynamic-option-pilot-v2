@@ -1,0 +1,101 @@
+{
+  "module": "strategies.covered_call_plugin",
+  "strategy_name": "Covered Call",
+  "strategy_type": "COVERED_CALL",
+  "description": "Own 100 shares and sell 1 call against it for income generation with limited upside",
+  
+  "universe": {
+    "symbol_types": ["STOCK", "ETF"],
+    "min_market_cap": 1000000000,
+    "min_avg_volume": 1000000,
+    "min_option_volume": 500,
+    "dividend_paying_preferred": true,
+    "exclude_high_volatility": true
+  },
+  
+  "position_parameters": {
+    "shares_per_contract": 100,
+    "max_position_pct_equity": 0.10,
+    "min_expected_return": 0.02,
+    "max_volatility": 0.30
+  },
+  
+  "entry_signals": {
+    "allowed_bias": ["NEUTRAL", "MILDLY_BULLISH"],
+    "min_expected_return": 0.02,
+    "max_volatility": 0.30,
+    "min_stock_ownership_days": 30
+  },
+  
+  "strike_selection": {
+    "premium_target_pct": 0.02,
+    "delta_max": 0.30,
+    "preferred_moneyness": "OTM",
+    "min_time_value": 0.50
+  },
+  
+  "exit_rules": {
+    "profit_targets": [
+      { 
+        "level": 0.50, 
+        "action": "ROLL_UP", 
+        "priority": 90,
+        "description": "Roll up and out when 50% profit achieved"
+      }
+    ],
+    "stop_loss_rules": [
+      { 
+        "type": "PERCENTAGE", 
+        "trigger": -0.20, 
+        "action": "CLOSE_ALL", 
+        "priority": 100,
+        "description": "Close if underlying drops 20%"
+      }
+    ],
+    "time_exits": [
+      { 
+        "condition": "dte_less_than", 
+        "value": 3, 
+        "action": "ROLL_DOWN", 
+        "priority": 80,
+        "description": "Roll down and out 3 days before expiration"
+      }
+    ],
+    "assignment_management": [
+      {
+        "condition": "itm_by_percent",
+        "threshold": 0.05,
+        "action": "PREPARE_ASSIGNMENT",
+        "priority": 85
+      }
+    ]
+  },
+  
+  "scoring": {
+    "premium_yield_weight": 0.6,
+    "volatility_weight": 0.4,
+    "dividend_bonus": 0.2,
+    "liquidity_weight": 0.3,
+    "score_floor": 1.0,
+    "score_ceiling": 10.0,
+    "round_decimals": 1
+  },
+  
+  "risk_management": {
+    "max_allocation_percentage": 40,
+    "max_single_position_size": 10,
+    "sector_concentration_limit": 0.3,
+    "correlation_limit": 0.6
+  },
+  
+  "educational_content": {
+    "best_for": "Conservative income generation on owned stocks",
+    "when_to_use": "Neutral to mildly bullish outlook on owned shares",
+    "profit_mechanism": "Collect call premium while retaining stock ownership",
+    "risk_level": "LOW-MEDIUM",
+    "typical_duration": "30-45 days",
+    "max_profit": "Call premium + any stock appreciation up to strike",
+    "max_loss": "Stock can decline to zero minus call premium collected",
+    "assignment_risk": "HIGH - be prepared to sell shares at strike price"
+  }
+}

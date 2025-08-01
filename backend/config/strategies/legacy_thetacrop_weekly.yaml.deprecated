@@ -1,0 +1,52 @@
+# ThetaCrop Weekly Strategy Configuration
+# External configuration following V2 architecture principles
+
+strategy:
+  id: "thetacrop_weekly"
+  name: "ThetaCrop Weekly"
+  category: "theta_harvesting"
+  description: "Weekly short-volatility iron-condor strategy optimized for ETF options"
+  version: "2.0.0"
+
+# Trading parameters (externalized from V1 hardcoded values)
+trading:
+  entry_day: 3  # Thursday (0=Monday) - can be overridden for testing
+  entry_time: "11:30"  # ET time for optimal entries
+  target_dte_range: [5, 6, 7, 8, 9, 10]  # Days to expiration range
+  delta_target: 0.20  # ±20 delta wings for balanced risk
+  wing_widths: [2, 3, 4]  # $2-$4 spreads for optimal risk/reward
+  min_credit_ratio: 0.15  # Minimum 15% credit-to-width ratio
+  max_positions: 5  # Risk management limit
+
+# Universe and symbols (externalized)
+universe:
+  primary_symbols: ["SPY", "QQQ", "IWM"]
+  universe_file: "backend/data/universes/thetacrop_symbols.txt"
+  position_size_per_3k: 1  # 1 condor per $3,000 equity
+
+# Risk management parameters (externalized)
+risk:
+  profit_target: 0.50  # Take profit at 50% of max profit
+  loss_limit: 0.30  # Stop loss at 30% of premium collected
+  min_dte_exit: 1  # Close if 1 day or less to expiration
+  assignment_risk_threshold: 0.10  # Close if within 10% of strikes
+
+# Market conditions filtering
+market_conditions:
+  min_iv_rank: 20  # Minimum implied volatility rank
+  max_iv_rank: 80  # Maximum implied volatility rank
+  min_liquidity_score: 7.0  # Minimum options liquidity score
+  max_spread_width: 0.05  # Maximum bid-ask spread as % of mid
+
+# Performance tracking (externalized from V1 embedded logic)
+performance:
+  track_statistics: true
+  log_trades: true
+  calculate_sharpe: true
+  benchmark_symbol: "SPY"
+
+# Testing overrides (for development)
+testing:
+  allow_any_day: true  # Override entry_day for testing
+  extended_hours: true  # Allow 9 AM - 8 PM ET for testing
+  mock_data_enabled: false  # Use real data, not mocks

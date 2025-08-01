@@ -9,6 +9,7 @@ import logging
 from dataclasses import dataclass
 
 from core.orchestrator.base_plugin import DataProviderPlugin, PluginMetadata, PluginType, PluginConfig
+from core.interfaces.data_provider_interface import IDataProvider
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +45,7 @@ class OptionChain:
     puts: pd.DataFrame
 
 
-class YFinanceProvider(DataProviderPlugin):
+class YFinanceProvider(DataProviderPlugin, IDataProvider):
     """Yahoo Finance data provider with intelligent caching."""
     
     def __init__(self, config: PluginConfig = None):

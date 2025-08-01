@@ -1,0 +1,26 @@
+# TOP 20 - Most Liquid Large Cap Stocks for Options Trading
+# Based on market cap, volume, and options liquidity
+
+# MAG 7 Tech Giants
+AAPL  # Apple Inc.
+MSFT  # Microsoft Corp.
+GOOGL # Alphabet Inc. Class A
+AMZN  # Amazon.com Inc.
+NVDA  # NVIDIA Corp.
+TSLA  # Tesla Inc.
+META  # Meta Platforms Inc.
+
+# Other Large Caps with High Options Volume
+BRK-B # Berkshire Hathaway Inc. Class B
+AVGO  # Broadcom Inc.
+WMT   # Walmart Inc.
+LLY   # Eli Lilly and Co.
+JPM   # JPMorgan Chase & Co.
+V     # Visa Inc. Class A
+UNH   # UnitedHealth Group Inc.
+XOM   # Exxon Mobil Corp.
+MA    # Mastercard Inc. Class A
+PG    # Procter & Gamble Co.
+JNJ   # Johnson & Johnson
+HD    # Home Depot Inc.
+COST  # Costco Wholesale Corp.

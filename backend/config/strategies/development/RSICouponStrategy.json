@@ -1,0 +1,102 @@
+{
+  "module": "strategies.rsi_coupon_plugin",
+  "strategy_name": "RSI Coupon Strategy",
+  "strategy_type": "RSI_COUPON",
+  "description": "Funnel: screen oversold equities (RSI) + sentiment filter, then overlay high-probability options plays",
+  
+  "universe": {
+    "symbol_for_full_universe": "SPY",
+    "max_universe_symbols": 10,
+    "min_market_cap": 1000000000,
+    "min_avg_volume": 1000000,
+    "exclude_earnings_days": 3
+  },
+  
+  "technical_indicators": {
+    "rsi_thresholds": { 
+      "min_rsi": 30, 
+      "max_rsi": 45 
+    },
+    "rsi_period": 14,
+    "additional_filters": {
+      "bollinger_position": { "max": 0.3 },
+      "volume_ratio": { "min": 1.2 }
+    }
+  },
+  
+  "position_parameters": {
+    "target_dtes": [20, 30, 45],
+    "max_opportunities": 5,
+    "preferred_delta_range": [0.25, 0.40],
+    "min_probability_profit": 0.65
+  },
+  
+  "entry_signals": {
+    "rsi_below": 45,
+    "allow_bias": ["BULLISH", "NEUTRAL", "SLIGHTLY_BEARISH"],
+    "required_oversold_confirmation": true,
+    "min_signal_strength": "MODERATE"
+  },
+  
+  "scoring": {
+    "base_probability_weight": 5.0,
+    "rsi_bonus": [
+      { "rsi_lt": 25, "bonus": 2.0 },
+      { "rsi_lt": 30, "bonus": 1.5 },
+      { "rsi_lt": 35, "bonus": 1.0 },
+      { "default": 0.5 }
+    ],
+    "risk_reward_bonus": { 
+      "multiplier": 0.5, 
+      "cap": 1.5 
+    },
+    "score_ceiling": 10.0,
+    "score_floor": 2.0,
+    "round_decimals": 1
+  },
+  
+  "trade_setup_mapping": {
+    "oversold": "BULLISH_REVERSAL",
+    "deeply_oversold": "STRONG_BULLISH_REVERSAL",
+    "default": "NEUTRAL"
+  },
+  
+  "risk_management": {
+    "max_allocation_percentage": 20,
+    "max_correlation": 0.6,
+    "position_sizing": {
+      "base_size_per_3k": 1,
+      "rsi_size_multiplier": {
+        "rsi_lt_25": 1.5,
+        "rsi_lt_30": 1.2,
+        "default": 1.0
+      }
+    }
+  },
+  
+  "exit_rules": {
+    "profit_targets": [
+      { "level": 0.60, "action": "CLOSE_HALF", "percentage": 0.5, "priority": 80 },
+      { "level": 0.80, "action": "CLOSE_ALL", "percentage": 1.0, "priority": 85 }
+    ],
+    "stop_loss_rules": [
+      { "type": "PERCENTAGE", "trigger": -0.40, "action": "CLOSE_ALL", "priority": 100 }
+    ],
+    "technical_exits": [
+      { "condition": "rsi_above", "value": 70, "action": "CLOSE_ALL", "priority": 90 }
+    ],
+    "time_exits": [
+      { "condition": "dte_less_than", "value": 7, "action": "CLOSE_ALL", "priority": 85 }
+    ]
+  },
+  
+  "educational_content": {
+    "best_for": "Mean reversion trades on oversold conditions",
+    "when_to_use": "RSI below 45 with additional oversold confirmation",
+    "profit_mechanism": "Bounce from oversold levels combined with options premium decay",
+    "risk_level": "MEDIUM",
+    "typical_duration": "20-45 days",
+    "max_profit": "Strike price - premium paid (puts) or premium collected (calls)",
+    "max_loss": "Premium paid or collected"
+  }
+}

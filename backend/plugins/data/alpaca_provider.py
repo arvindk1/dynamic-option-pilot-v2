@@ -7,6 +7,7 @@ import asyncio
 import logging
 
 from core.orchestrator.base_plugin import DataProviderPlugin, PluginMetadata, PluginType, PluginConfig
+from core.interfaces.data_provider_interface import IDataProvider
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +20,7 @@ except ImportError:
     logger.warning("alpaca-trade-api not installed. Install with: pip install alpaca-trade-api")
 
 
-class AlpacaProvider(DataProviderPlugin):
+class AlpacaProvider(DataProviderPlugin, IDataProvider):
     """Alpaca Markets data provider for real market data."""
     
     def __init__(self, config: PluginConfig = None):
@@ -354,3 +355,21 @@ class AlpacaProvider(DataProviderPlugin):
             
         except Exception:
             return None
+    
+    async def validate_symbol(self, symbol: str) -> bool:
+        """Validate if symbol is supported by Alpaca."""
+        if not self.client:
+            return False
+            
+        # Check against known unsupported symbols first
+        unsupported_symbols = ['^VIX', 'VIX', '^SPX', '^RUT', '^NDX']
+        if symbol.upper() in [s.upper() for s in unsupported_symbols]:
+            return False
+        
+        try:
+            # Try to get a quote for the symbol to validate it exists
+            latest_quote = self.client.get_latest_quote(symbol)
+            return latest_quote is not None
+        except Exception:
+            # If we can't get a quote, assume symbol is invalid
+            return False

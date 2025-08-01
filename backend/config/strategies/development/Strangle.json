@@ -1,0 +1,126 @@
+{
+  "module": "strategies.strangle_plugin",
+  "strategy_name": "Strangle",
+  "strategy_type": "STRANGLE",
+  "description": "Buy an OTM call and an OTM put at different strikes - lower cost alternative to straddle",
+  
+  "universe": {
+    "symbol_types": ["STOCK", "ETF"],
+    "min_market_cap": 5000000000,
+    "min_avg_volume": 3000000,
+    "min_option_volume": 1000,
+    "high_volatility_candidates": true,
+    "earnings_candidates": true
+  },
+  
+  "position_parameters": {
+    "max_premium_cost": 0.03,
+    "max_opportunities": 3,
+    "position_size_limit": 1500
+  },
+  
+  "entry_signals": {
+    "volatility_min": 0.35,
+    "bias": "ANY",
+    "implied_volatility_rank_min": 40,
+    "expected_move_threshold": 0.06
+  },
+  
+  "strike_selection": {
+    "call_percent_otm": 0.02,
+    "put_percent_otm": 0.02,
+    "delta_targets": {
+      "call_delta": 0.25,
+      "put_delta": -0.25
+    },
+    "strike_spacing_rules": [
+      { "price_lt": 50,  "spacing": 2.5 },
+      { "price_lt": 200, "spacing": 5   },
+      { "default": 10 }
+    ]
+  },
+  
+  "timing": {
+    "dte_range": [7, 60],
+    "optimal_dte": [21, 35],
+    "earnings_timing": {
+      "days_before_earnings": [1, 7],
+      "avoid_post_earnings": true
+    }
+  },
+  
+  "exit_rules": {
+    "profit_targets": [
+      { 
+        "level": 1.00, 
+        "action": "CLOSE_ALL", 
+        "priority": 90,
+        "description": "Close when doubled investment"
+      },
+      { 
+        "level": 0.50, 
+        "action": "CLOSE_HALF", 
+        "priority": 80,
+        "description": "Take partial profits at 50% gain"
+      }
+    ],
+    "stop_loss_rules": [
+      { 
+        "type": "PERCENTAGE", 
+        "trigger": -0.50, 
+        "action": "CLOSE_ALL", 
+        "priority": 100,
+        "description": "Close at 50% loss"
+      }
+    ],
+    "time_exits": [
+      { 
+        "condition": "dte_less_than", 
+        "value": 5, 
+        "action": "CLOSE_ALL", 
+        "priority": 85,
+        "description": "Close 5 days before expiration"
+      }
+    ],
+    "single_leg_management": [
+      {
+        "condition": "one_leg_itm",
+        "action": "CLOSE_WINNING_LEG",
+        "priority": 75,
+        "description": "Close profitable leg if one side moves ITM"
+      }
+    ]
+  },
+  
+  "scoring": {
+    "volatility_weight": 0.5,
+    "strike_offset_weight": 0.5,
+    "cost_efficiency_bonus": 0.3,
+    "liquidity_weight": 0.2,
+    "earnings_proximity_bonus": 1.2,
+    "score_floor": 1.0,
+    "score_ceiling": 10.0,
+    "round_decimals": 1
+  },
+  
+  "risk_management": {
+    "max_allocation_percentage": 12,
+    "max_single_strangle_cost": 1500,
+    "volatility_risk_limit": 0.5,
+    "strike_width_limits": {
+      "min_width": 5,
+      "max_width": 25
+    }
+  },
+  
+  "educational_content": {
+    "best_for": "Large directional moves with lower cost than straddle",
+    "when_to_use": "High volatility expectation but want lower premium cost",
+    "profit_mechanism": "Large price movement beyond strike prices plus premium",
+    "risk_level": "HIGH",
+    "typical_duration": "21-35 days",
+    "max_profit": "Unlimited in either direction",
+    "max_loss": "Total premium paid for both options",
+    "breakevens": ["Put strike - total premium", "Call strike + total premium"]
+  }
+}

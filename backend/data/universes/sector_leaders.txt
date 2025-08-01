@@ -1,0 +1,41 @@
+# Sector Leaders - Top liquid stocks by sector for targeted strategies
+
+# Technology
+AAPL  # Apple Inc. - Consumer Electronics
+MSFT  # Microsoft Corp. - Software
+GOOGL # Alphabet Inc. - Internet Services
+NVDA  # NVIDIA Corp. - Semiconductors
+AMD   # Advanced Micro Devices - Semiconductors
+CRM   # Salesforce Inc. - Cloud Software
+ADBE  # Adobe Inc. - Software
+
+# Healthcare & Pharma
+UNH   # UnitedHealth Group - Health Insurance
+JNJ   # Johnson & Johnson - Pharmaceuticals
+LLY   # Eli Lilly - Pharmaceuticals
+PFE   # Pfizer Inc. - Pharmaceuticals
+ABBV  # AbbVie Inc. - Pharmaceuticals
+
+# Financial
+JPM   # JPMorgan Chase - Banking
+BAC   # Bank of America - Banking
+WFC   # Wells Fargo - Banking
+GS    # Goldman Sachs - Investment Banking
+MS    # Morgan Stanley - Investment Banking
+
+# Consumer
+AMZN  # Amazon - E-commerce
+WMT   # Walmart - Retail
+HD    # Home Depot - Home Improvement
+MCD   # McDonald's - Fast Food
+NKE   # Nike Inc. - Apparel
+
+# Energy
+XOM   # Exxon Mobil - Oil & Gas
+CVX   # Chevron Corp. - Oil & Gas
+COP   # ConocoPhillips - Oil & Gas
+
+# Industrial
+BA    # Boeing Co. - Aerospace
+CAT   # Caterpillar Inc. - Heavy Machinery
+GE    # General Electric - Conglomerate

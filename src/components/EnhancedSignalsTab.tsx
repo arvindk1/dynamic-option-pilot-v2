@@ -36,6 +36,21 @@ interface CompositeSignal {
   };
 }
 
+// Backend API response interface (what we actually receive)
+interface BackendSignalResponse {
+  symbol: string;
+  composite_bias: 'BULLISH' | 'BEARISH' | 'NEUTRAL';
+  bias_strength: number;
+  confidence: number;
+  individual_signals: Record<string, {
+    bias: 'BULLISH' | 'BEARISH' | 'NEUTRAL';
+    strength: number;
+    value: number;
+  }>;
+  last_updated: string;
+  scan_time?: string;
+}
+
 interface SignalPerformance {
   accuracy_metrics: {
     '7_day_accuracy': number | null;
@@ -45,6 +60,99 @@ interface SignalPerformance {
   signal_weights: Record<string, number>;
   tracking_period_days: number;
   last_updated: string;
+}
+
+// Data transformation functions
+const transformConfidenceToString = (confidence: number): 'HIGH' | 'MEDIUM' | 'LOW' => {
+  if (confidence >= 0.8) return 'HIGH';
+  if (confidence >= 0.6) return 'MEDIUM';
+  return 'LOW';
+};
+
+const getSignalSourceFromName = (name: string): string => {
+  const sourceMap: Record<string, string> = {
+    'rsi': 'technical',
+    'macd': 'technical',
+    'volume': 'market_structure',
+    'momentum': 'technical',
+    'volatility': 'volatility',
+    'sentiment': 'sentiment',
+    'economic': 'economic'
+  };
+  return sourceMap[name.toLowerCase()] || 'technical';
+};
+
+const getSignalDescription = (name: string, value: number, bias: string): string => {
+  const descriptions: Record<string, (value: number, bias: string) => string> = {
+    'rsi': (v, b) => `RSI at ${v.toFixed(1)} indicates ${b.toLowerCase()} momentum`,
+    'macd': (v, b) => `MACD signal ${v > 0 ? 'above' : 'below'} zero, showing ${b.toLowerCase()} trend`,
+    'volume': (v, b) => `Volume analysis suggests ${b.toLowerCase()} pressure`,
+    'momentum': (v, b) => `Price momentum indicator showing ${b.toLowerCase()} direction`
+  };
+  
+  const descFn = descriptions[name.toLowerCase()];
+  return descFn ? descFn(value, bias) : `${name} indicator showing ${bias.toLowerCase()} signal`;
+};
+
+const transformBackendResponse = (backendData: BackendSignalResponse): CompositeSignal => {
+  // Safely extract properties with defaults
+  const symbol = backendData?.symbol || 'UNKNOWN';
+  const bias = backendData?.composite_bias || 'NEUTRAL';
+  const biasStrength = backendData?.bias_strength || 0;
+  const confidenceNum = backendData?.confidence || 0;
+  const individualSignals = backendData?.individual_signals || {};
+  const timestamp = backendData?.last_updated || backendData?.scan_time || new Date().toISOString();
+
+  // Transform individual signals to contributing_signals array
+  const contributing_signals: Signal[] = Object.entries(individualSignals).map(([name, signal]) => ({
+    name: name.toUpperCase(),
+    value: signal?.value || 0,
+    bias: signal?.bias || 'NEUTRAL',
+    confidence: signal?.strength || 0,
+    weight: signal?.strength || 0, // Use strength as weight since we don't have separate weight
+    source: getSignalSourceFromName(name),
+    description: getSignalDescription(name, signal?.value || 0, signal?.bias || 'NEUTRAL'),
+    timestamp: timestamp
+  }));
+
+  // Calculate summary statistics
+  const total_signals = contributing_signals.length;
+  const bullish_signals = contributing_signals.filter(s => s.bias === 'BULLISH').length;
+  const bearish_signals = contributing_signals.filter(s => s.bias === 'BEARISH').length;
+  const neutral_signals = contributing_signals.filter(s => s.bias === 'NEUTRAL').length;
+
+  return {
+    symbol,
+    bias,
+    confidence: transformConfidenceToString(confidenceNum),
+    score: biasStrength,
+    timestamp,
+    accuracy: {
+      '7_day': null, // Backend doesn't provide this yet
+      '30_day': null // Backend doesn't provide this yet
+    },
+    contributing_signals,
+    summary: {
+      total_signals,
+      bullish_signals,
+      bearish_signals,
+      neutral_signals
+    }
+  };
+};
+
+// Safe property access helper
+function safeAccess<T>(obj: any, path: string[], defaultValue: T): T {
+  try {
+    let current = obj;
+    for (const key of path) {
+      if (current === null || current === undefined) return defaultValue;
+      current = current[key];
+    }
+    return current !== null && current !== undefined ? current : defaultValue;
+  } catch {
+    return defaultValue;
+  }
 }
 
 const EnhancedSignalsTab: React.FC = React.memo(() => {
@@ -58,12 +166,20 @@ const EnhancedSignalsTab: React.FC = React.memo(() => {
     try {
       const response = await fetch('/api/signals/composite-bias?symbol=SPY');
       if (response.ok) {
-        const data = await response.json();
-        setCompositeSignal(data);
+        const backendData: BackendSignalResponse = await response.json();
+        // Transform backend response to frontend interface
+        const transformedData = transformBackendResponse(backendData);
+        setCompositeSignal(transformedData);
         setLastUpdate(new Date());
+      } else {
+        console.error('Failed to fetch composite signal:', response.status, response.statusText);
+        // Set empty state instead of crashing
+        setCompositeSignal(null);
       }
     } catch (error) {
       console.error('Error fetching composite signal:', error);
+      // Set empty state instead of crashing
+      setCompositeSignal(null);
     } finally {
       setLoading(false);
     }
@@ -149,6 +265,36 @@ const EnhancedSignalsTab: React.FC = React.memo(() => {
         </Button>
       </div>
 
+      {/* Loading State */}
+      {loading && !compositeSignal && (
+        <Card className="bg-gradient-to-br from-card to-card/50 border-border">
+          <CardContent className="text-center py-8">
+            <div className="flex items-center justify-center gap-2">
+              <RefreshCw className="w-6 h-6 animate-spin" />
+              <p className="text-muted-foreground">Loading signal data...</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Error State */}
+      {!loading && !compositeSignal && (
+        <Card className="bg-gradient-to-br from-card to-card/50 border-border border-red-500/20">
+          <CardContent className="text-center py-8">
+            <p className="text-muted-foreground">Failed to load signal data</p>
+            <Button 
+              onClick={fetchCompositeSignal} 
+              className="mt-4"
+              variant="outline"
+              size="sm"
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Main Composite Signal Card */}
       {compositeSignal && (
         <Card className="bg-gradient-to-br from-card to-card/50 border-border">
@@ -163,23 +309,23 @@ const EnhancedSignalsTab: React.FC = React.memo(() => {
               {/* Bias Display */}
               <div className="text-center">
                 <div className="flex items-center justify-center gap-2 mb-2">
-                  {getBiasIcon(compositeSignal.bias)}
-                  <div className={`text-4xl font-bold ${getBiasColor(compositeSignal.bias)}`}>
-                    {compositeSignal.bias}
+                  {getBiasIcon(safeAccess(compositeSignal, ['bias'], 'NEUTRAL'))}
+                  <div className={`text-4xl font-bold ${getBiasColor(safeAccess(compositeSignal, ['bias'], 'NEUTRAL'))}`}>
+                    {safeAccess(compositeSignal, ['bias'], 'NEUTRAL')}
                   </div>
                 </div>
-                <Badge className={getConfidenceColor(compositeSignal.confidence)}>
-                  {compositeSignal.confidence} Confidence
+                <Badge className={getConfidenceColor(safeAccess(compositeSignal, ['confidence'], 'LOW'))}>
+                  {safeAccess(compositeSignal, ['confidence'], 'LOW')} Confidence
                 </Badge>
               </div>
 
               {/* Score and Metrics */}
               <div className="text-center">
                 <div className="text-2xl font-bold text-muted-foreground mb-2">
-                  Score: {compositeSignal.score > 0 ? '+' : ''}{compositeSignal.score}
+                  Score: {safeAccess(compositeSignal, ['score'], 0) > 0 ? '+' : ''}{safeAccess(compositeSignal, ['score'], 0).toFixed(2)}
                 </div>
                 <Progress 
-                  value={Math.abs(compositeSignal.score) * 100} 
+                  value={Math.min(Math.abs(safeAccess(compositeSignal, ['score'], 0)) * 100, 100)} 
                   className="w-full"
                 />
                 <p className="text-sm text-muted-foreground mt-2">
@@ -196,19 +342,19 @@ const EnhancedSignalsTab: React.FC = React.memo(() => {
                   <div className="flex justify-between">
                     <span className="text-sm">7-day:</span>
                     <span className="text-sm font-bold">
-                      {compositeSignal.accuracy['7_day'] !== null 
-                        ? `${(compositeSignal.accuracy['7_day'] * 100).toFixed(1)}%`
-                        : 'N/A'
-                      }
+                      {(() => {
+                        const accuracy = safeAccess(compositeSignal, ['accuracy', '7_day'], null);
+                        return accuracy !== null ? `${(accuracy * 100).toFixed(1)}%` : 'N/A';
+                      })()}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm">30-day:</span>
                     <span className="text-sm font-bold">
-                      {compositeSignal.accuracy['30_day'] !== null 
-                        ? `${(compositeSignal.accuracy['30_day'] * 100).toFixed(1)}%`
-                        : 'N/A'
-                      }
+                      {(() => {
+                        const accuracy = safeAccess(compositeSignal, ['accuracy', '30_day'], null);
+                        return accuracy !== null ? `${(accuracy * 100).toFixed(1)}%` : 'N/A';
+                      })()}
                     </span>
                   </div>
                 </div>
@@ -219,19 +365,19 @@ const EnhancedSignalsTab: React.FC = React.memo(() => {
             <div className="mt-6 pt-6 border-t border-border">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
                 <div className="bg-muted p-3 rounded-lg">
-                  <div className="text-lg font-bold">{compositeSignal.summary.total_signals}</div>
+                  <div className="text-lg font-bold">{safeAccess(compositeSignal, ['summary', 'total_signals'], 0)}</div>
                   <div className="text-sm text-muted-foreground">Total Signals</div>
                 </div>
                 <div className="bg-muted p-3 rounded-lg">
-                  <div className="text-lg font-bold text-green-400">{compositeSignal.summary.bullish_signals}</div>
+                  <div className="text-lg font-bold text-green-400">{safeAccess(compositeSignal, ['summary', 'bullish_signals'], 0)}</div>
                   <div className="text-sm text-muted-foreground">Bullish</div>
                 </div>
                 <div className="bg-muted p-3 rounded-lg">
-                  <div className="text-lg font-bold text-red-400">{compositeSignal.summary.bearish_signals}</div>
+                  <div className="text-lg font-bold text-red-400">{safeAccess(compositeSignal, ['summary', 'bearish_signals'], 0)}</div>
                   <div className="text-sm text-muted-foreground">Bearish</div>
                 </div>
                 <div className="bg-muted p-3 rounded-lg">
-                  <div className="text-lg font-bold text-yellow-400">{compositeSignal.summary.neutral_signals}</div>
+                  <div className="text-lg font-bold text-yellow-400">{safeAccess(compositeSignal, ['summary', 'neutral_signals'], 0)}</div>
                   <div className="text-sm text-muted-foreground">Neutral</div>
                 </div>
               </div>
@@ -255,60 +401,64 @@ const EnhancedSignalsTab: React.FC = React.memo(() => {
 
         {/* Individual Signals Tab */}
         <TabsContent value="individual" className="space-y-4">
-          {compositeSignal?.contributing_signals && compositeSignal.contributing_signals.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {compositeSignal.contributing_signals.map((signal, index) => (
-                <Card key={index} className="bg-card border-border hover:bg-card/80 transition-colors">
-                  <CardHeader className="pb-3">
-                    <div className="flex justify-between items-start">
-                      <CardTitle className="text-base">{signal.name}</CardTitle>
-                      <Badge className={getSignalSourceBadgeColor(signal.source)}>
-                        {signal.source}
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">Value:</span>
-                        <span className="font-bold">{signal.value.toFixed(2)}</span>
+          {(() => {
+            const signals = safeAccess(compositeSignal, ['contributing_signals'], []);
+            return signals && signals.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {signals.map((signal: Signal, index: number) => (
+                  <Card key={index} className="bg-card border-border hover:bg-card/80 transition-colors">
+                    <CardHeader className="pb-3">
+                      <div className="flex justify-between items-start">
+                        <CardTitle className="text-base">{safeAccess(signal, ['name'], 'Unknown Signal')}</CardTitle>
+                        <Badge className={getSignalSourceBadgeColor(safeAccess(signal, ['source'], 'technical'))}>
+                          {safeAccess(signal, ['source'], 'technical')}
+                        </Badge>
                       </div>
-                      
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">Bias:</span>
-                        <div className="flex items-center gap-1">
-                          {getBiasIcon(signal.bias)}
-                          <span className={`font-bold text-sm ${getBiasColor(signal.bias)}`}>
-                            {signal.bias}
-                          </span>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Value:</span>
+                          <span className="font-bold">{safeAccess(signal, ['value'], 0).toFixed(2)}</span>
+                        </div>
+                        
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Bias:</span>
+                          <div className="flex items-center gap-1">
+                            {getBiasIcon(safeAccess(signal, ['bias'], 'NEUTRAL'))}
+                            <span className={`font-bold text-sm ${getBiasColor(safeAccess(signal, ['bias'], 'NEUTRAL'))}`}>
+                              {safeAccess(signal, ['bias'], 'NEUTRAL')}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Confidence:</span>
+                          <span className="font-bold">{(safeAccess(signal, ['confidence'], 0) * 100).toFixed(0)}%</span>
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Weight:</span>
+                          <span className="font-bold">{(safeAccess(signal, ['weight'], 0) * 100).toFixed(0)}%</span>
+                        </div>
+
+                        <div className="pt-2 border-t border-border">
+                          <p className="text-xs text-muted-foreground">{safeAccess(signal, ['description'], 'No description available')}</p>
                         </div>
                       </div>
-
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">Confidence:</span>
-                        <span className="font-bold">{(signal.confidence * 100).toFixed(0)}%</span>
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">Weight:</span>
-                        <span className="font-bold">{(signal.weight * 100).toFixed(0)}%</span>
-                      </div>
-
-                      <div className="pt-2 border-t border-border">
-                        <p className="text-xs text-muted-foreground">{signal.description}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : (
-            <Card className="bg-card border-border">
-              <CardContent className="text-center py-8">
-                <p className="text-muted-foreground">No individual signals available</p>
-              </CardContent>
-            </Card>
-          )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <Card className="bg-card border-border">
+                <CardContent className="text-center py-8">
+                  <p className="text-muted-foreground">No individual signals available</p>
+                  {!compositeSignal && <p className="text-sm text-muted-foreground mt-2">Loading signal data...</p>}
+                </CardContent>
+              </Card>
+            );
+          })()}
         </TabsContent>
 
         {/* Performance Tab */}
@@ -324,25 +474,25 @@ const EnhancedSignalsTab: React.FC = React.memo(() => {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="text-center">
                       <div className="text-3xl font-bold text-green-400 mb-2">
-                        {signalPerformance.accuracy_metrics['7_day_accuracy'] !== null 
-                          ? `${(signalPerformance.accuracy_metrics['7_day_accuracy'] * 100).toFixed(1)}%`
-                          : 'N/A'
-                        }
+                        {(() => {
+                          const accuracy = safeAccess(signalPerformance, ['accuracy_metrics', '7_day_accuracy'], null);
+                          return accuracy !== null ? `${(accuracy * 100).toFixed(1)}%` : 'N/A';
+                        })()}
                       </div>
                       <p className="text-sm text-muted-foreground">7-Day Accuracy</p>
                     </div>
                     <div className="text-center">
                       <div className="text-3xl font-bold text-blue-400 mb-2">
-                        {signalPerformance.accuracy_metrics['30_day_accuracy'] !== null 
-                          ? `${(signalPerformance.accuracy_metrics['30_day_accuracy'] * 100).toFixed(1)}%`
-                          : 'N/A'
-                        }
+                        {(() => {
+                          const accuracy = safeAccess(signalPerformance, ['accuracy_metrics', '30_day_accuracy'], null);
+                          return accuracy !== null ? `${(accuracy * 100).toFixed(1)}%` : 'N/A';
+                        })()}
                       </div>
                       <p className="text-sm text-muted-foreground">30-Day Accuracy</p>
                     </div>
                     <div className="text-center">
                       <div className="text-3xl font-bold text-purple-400 mb-2">
-                        {signalPerformance.accuracy_metrics.total_predictions}
+                        {safeAccess(signalPerformance, ['accuracy_metrics', 'total_predictions'], 0)}
                       </div>
                       <p className="text-sm text-muted-foreground">Total Predictions</p>
                     </div>
@@ -357,15 +507,18 @@ const EnhancedSignalsTab: React.FC = React.memo(() => {
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {Object.entries(signalPerformance.signal_weights).map(([signal, weight]) => (
-                      <div key={signal} className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                        <span className="font-medium capitalize">{signal.replace('_', ' ')}</span>
-                        <div className="flex items-center gap-2">
-                          <Progress value={weight * 100} className="w-24" />
-                          <span className="text-sm font-bold">{(weight * 100).toFixed(0)}%</span>
+                    {(() => {
+                      const weights = safeAccess(signalPerformance, ['signal_weights'], {});
+                      return Object.entries(weights).map(([signal, weight]) => (
+                        <div key={signal} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                          <span className="font-medium capitalize">{signal.replace('_', ' ')}</span>
+                          <div className="flex items-center gap-2">
+                            <Progress value={Math.min((weight as number) * 100, 100)} className="w-24" />
+                            <span className="text-sm font-bold">{((weight as number) * 100).toFixed(0)}%</span>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      ));
+                    })()}
                   </div>
                 </CardContent>
               </Card>

@@ -169,11 +169,11 @@ export const TradeCard: React.FC<TradeCardProps> = React.memo(({
         <div className="flex items-center justify-between text-sm">
           <div className="flex items-center text-muted-foreground">
             {getSetupIcon(trade.trade_setup)}
-            <span className="ml-1">{trade.trade_setup.replace('_', ' ')}</span>
+            <span className="ml-1">{trade.trade_setup?.replace('_', ' ') || 'Premium Collection'}</span>
           </div>
           <div className="flex items-center text-muted-foreground">
             <Calendar className="h-4 w-4 mr-1" />
-            {trade.expiration}
+            {trade.expiration || `${trade.days_to_expiration}d`}
           </div>
         </div>
         

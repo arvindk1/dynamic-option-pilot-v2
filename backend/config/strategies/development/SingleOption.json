@@ -1,0 +1,86 @@
+{
+  "module": "strategies.single_option_plugin",
+  "strategy_name": "Single Option",
+  "strategy_type": "NAKED_OPTION",
+  "description": "Single leg option trades based on strong directional signals with high premium capture",
+  
+  "universe": {
+    "symbol_types": ["STOCK", "ETF"],
+    "min_volume": 500000,
+    "min_option_volume": 1000,
+    "exclude_earnings": true
+  },
+  
+  "position_parameters": {
+    "delta_targets": [0.30, 0.40, 0.50],
+    "min_dte": 7,
+    "max_dte": 30,
+    "min_premium": 0.50,
+    "max_opportunities": 4,
+    "expiration_limit": 3,
+    "position_size_per_3k": 1
+  },
+  
+  "strike_selection": {
+    "strike_spacing_rules": [
+      { "price_lt": 50,  "spacing": 2.5 },
+      { "price_lt": 200, "spacing": 5   },
+      { "default": 10 }
+    ]
+  },
+  
+  "entry_signals": {
+    "required_signal_strength": ["STRONG"],
+    "forbidden_bias": ["NEUTRAL"],
+    "allowed_bias": ["BULLISH", "BEARISH"],
+    "min_conviction_score": 7.0
+  },
+  
+  "scoring": {
+    "signal_strength_weights": { 
+      "STRONG": 4.0, 
+      "MODERATE": 2.0, 
+      "WEAK": 0.5 
+    },
+    "ev_multiplier": 2.0,
+    "prob_multiplier": 2.0,
+    "volatility_bonus": { 
+      "HIGH": 1.0, 
+      "NORMAL": 0.5, 
+      "LOW": 0.0 
+    },
+    "score_floor": 1.0,
+    "score_ceiling": 10.0,
+    "round_decimals": 1
+  },
+  
+  "risk_management": {
+    "risk_level": "HIGH",
+    "max_allocation_percentage": 10,
+    "stop_loss_percentage": 50,
+    "profit_target_percentage": 75,
+    "max_single_position_risk": 500
+  },
+  
+  "exit_rules": {
+    "profit_targets": [
+      { "level": 0.75, "action": "CLOSE_ALL", "percentage": 1.0, "priority": 85 }
+    ],
+    "stop_loss_rules": [
+      { "type": "PERCENTAGE", "trigger": -0.50, "action": "CLOSE_ALL", "priority": 100 }
+    ],
+    "time_exits": [
+      { "condition": "dte_less_than", "value": 2, "action": "CLOSE_ALL", "priority": 90 }
+    ]
+  },
+  
+  "educational_content": {
+    "best_for": "High conviction directional trades with significant premium",
+    "when_to_use": "Strong technical or fundamental signals with elevated volatility",
+    "profit_mechanism": "Directional movement in underlying asset",
+    "risk_level": "HIGH",
+    "typical_duration": "7-30 days",
+    "max_profit": "Unlimited (calls) or substantial (puts)",
+    "max_loss": "Total premium paid"
+  }
+}

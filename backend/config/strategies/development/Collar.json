@@ -1,0 +1,137 @@
+{
+  "module": "strategies.collar_plugin",
+  "strategy_name": "Collar",
+  "strategy_type": "COLLAR",
+  "description": "Own stock, sell a call, buy a put - protective strategy with income generation",
+  
+  "universe": {
+    "symbol_types": ["STOCK"],
+    "min_market_cap": 2000000000,
+    "min_avg_volume": 1000000,
+    "min_option_volume": 500,
+    "dividend_paying_preferred": true,
+    "owned_stocks_only": true
+  },
+  
+  "position_parameters": {
+    "shares_per_contract": 100,
+    "max_cost_pct_equity": 0.02,
+    "min_protection_level": 0.90,
+    "income_target_pct": 0.015
+  },
+  
+  "entry_signals": {
+    "bias": ["NEUTRAL", "SLIGHTLY_BULLISH"],
+    "max_cost_pct_equity": 0.02,
+    "volatility_protection_needed": true,
+    "existing_stock_position_required": true
+  },
+  
+  "strike_selection": {
+    "call_delta_max": 0.30,
+    "put_delta_target": 0.30,
+    "collar_width_limits": {
+      "min_width": 5,
+      "max_width": 25
+    },
+    "cost_optimization": "MINIMIZE_NET_COST"
+  },
+  
+  "timing": {
+    "dte_range": [7, 60],
+    "optimal_dte": [30, 45],
+    "earnings_consideration": "ALLOW",
+    "dividend_timing": "OPTIMIZE_FOR_DIVIDENDS"
+  },
+  
+  "exit_rules": {
+    "profit_targets": [
+      { 
+        "level": 0.50, 
+        "action": "CLOSE_PUT", 
+        "priority": 90,
+        "description": "Close put when 50% profit achieved"
+      }
+    ],
+    "stop_loss_rules": [
+      { 
+        "type": "PERCENTAGE", 
+        "trigger": -0.50, 
+        "action": "CLOSE_PUT", 
+        "priority": 100,
+        "description": "Close put at 50% loss"
+      }
+    ],
+    "time_exits": [
+      { 
+        "condition": "dte_less_than", 
+        "value": 3, 
+        "action": "CLOSE_ALL", 
+        "priority": 80,
+        "description": "Close options 3 days before expiration"
+      }
+    ],
+    "assignment_management": [
+      {
+        "condition": "call_assignment_risk",
+        "action": "ROLL_CALL_UP",
+        "priority": 85,
+        "description": "Roll call up if assignment likely"
+      },
+      {
+        "condition": "put_assignment_opportunity",
+        "action": "ACCEPT_ASSIGNMENT",
+        "priority": 75,
+        "description": "Accept put assignment to increase position"
+      }
+    ]
+  },
+  
+  "scoring": {
+    "protection_cost_weight": 0.7,
+    "income_weight": 0.3,
+    "dividend_capture_bonus": 0.2,
+    "cost_efficiency_multiplier": {
+      "zero_cost": 2.0,
+      "low_cost": 1.5,
+      "moderate_cost": 1.0,
+      "high_cost": 0.5
+    },
+    "score_floor": 1.0,
+    "score_ceiling": 10.0,
+    "round_decimals": 1
+  },
+  
+  "risk_management": {
+    "max_allocation_percentage": 30,
+    "max_collar_cost": 500,
+    "upside_cap_acceptance": 0.15,
+    "downside_protection_minimum": 0.10
+  },
+  
+  "collar_variations": {
+    "zero_cost_collar": {
+      "target": true,
+      "tolerance": 0.25
+    },
+    "protective_collar": {
+      "max_cost": 1.0,
+      "protection_priority": "HIGH"
+    },
+    "income_collar": {
+      "min_credit": 0.50,
+      "income_priority": "HIGH"
+    }
+  },
+  
+  "educational_content": {
+    "best_for": "Protecting long stock positions while generating income",
+    "when_to_use": "Neutral to slightly bullish with downside protection needs",
+    "profit_mechanism": "Collect call premium, pay for put protection, keep dividends",
+    "risk_level": "LOW",
+    "typical_duration": "30-45 days",
+    "max_profit": "Call strike - stock cost + call premium - put premium + dividends",
+    "max_loss": "Stock cost - put strike + put premium - call premium",
+    "trade_offs": "Limited upside for downside protection and income"
+  }
+}

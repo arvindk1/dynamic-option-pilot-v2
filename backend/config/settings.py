@@ -39,10 +39,21 @@ class TradingConfig:
     max_position_size: float = 1000.0
     max_portfolio_risk: float = 0.02  # 2%
     default_universe: list = None
+    environment: str = "development"  # development, production, sandbox
+    strategy_config_path: str = None
     
     def __post_init__(self):
         if self.default_universe is None:
-            self.default_universe = ["SPY", "QQQ", "IWM", "AAPL", "MSFT", "GOOGL", "AMZN", "TSLA"]
+            # Load default universe from external file
+            try:
+                from utils.universe_loader import get_universe_loader
+                universe_loader = get_universe_loader()
+                self.default_universe = universe_loader.load_universe_symbols("default_etfs.txt")
+            except Exception:
+                # Final fallback only if external loading fails
+                self.default_universe = ["SPY", "QQQ", "IWM", "AAPL", "MSFT", "GOOGL", "AMZN", "TSLA"]
+        if self.strategy_config_path is None:
+            self.strategy_config_path = f"backend/config/strategies/{self.environment}"
 
 
 @dataclass
@@ -79,6 +90,15 @@ class LoggingConfig:
     max_file_size: int = 10 * 1024 * 1024  # 10MB
     backup_count: int = 5
 
+@dataclass
+class FeaturesConfig:
+    """Feature toggles for enabling/disabling core functions."""
+    scans: bool = True
+    sentiment: bool = True
+    rsi_coupon: bool = True
+    theta_crop: bool = True
+    troubleshooting: bool = True
+
 
 class Settings:
     """Application settings manager."""
@@ -98,6 +118,8 @@ class Settings:
         
         # Plugin configurations
         self.plugin_configs = self._config_data.get('plugins', {})
+        # Feature toggles
+        self.features = FeaturesConfig(**self._config_data.get('features', {}))
         
     def _get_default_config_path(self) -> str:
         """Get default configuration file path."""
@@ -199,7 +221,8 @@ class Settings:
             'analysis': self.analysis.__dict__,
             'api': self.api.__dict__,
             'logging': self.logging.__dict__,
-            'plugins': self.plugin_configs
+            'plugins': self.plugin_configs,
+            'features': self.features.__dict__,
         }
 
 

@@ -1,0 +1,9 @@
+# MAG 7 - Magnificent Seven Tech Giants
+# The most influential tech stocks driving market sentiment
+AAPL  # Apple Inc.
+MSFT  # Microsoft Corp.
+GOOGL # Alphabet Inc. Class A
+AMZN  # Amazon.com Inc.
+NVDA  # NVIDIA Corp.
+TSLA  # Tesla Inc.
+META  # Meta Platforms Inc.

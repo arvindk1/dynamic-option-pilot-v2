@@ -39,6 +39,8 @@ import { TradingTour, TourTrigger } from '@/components/TradingTour';
 import MarketStatusWidget from '@/components/MarketStatusWidget';
 // MarketCommentary is imported via LazyTabContent for better performance
 import { DemoDataService } from '@/services/demoData';
+import SystemStatus from '@/components/SystemStatus';
+import DemoModeAlert from '@/components/DemoModeAlert';
 import { dataThrottleService } from '@/services/dataThrottle';
 import { 
   LazyTabContent,
@@ -59,6 +61,7 @@ import { useAccessibility } from '@/components/AccessibilityProvider';
 import { TradingCardSkeleton, DashboardLoadingState } from '@/components/LoadingStates';
 import { TieredNavigation } from '@/components/TieredNavigation';
 import { HelpMenu } from '@/components/HelpMenu';
+import { StrategiesTab } from '@/components/StrategiesTab';
 
 interface TradingConfig {
   brokerPlugin: string;
@@ -310,7 +313,14 @@ const TradingDashboard = React.memo(() => {
           sharpe_ratio: metrics.sharpe_ratio || 0,
           options_level: metrics.options_level || 'Level 1',
           vix: metrics.vix || 18.5, // Default VIX value
-          iv_rank: metrics.iv_rank || 45 // Default IV rank
+          iv_rank: metrics.iv_rank || 45, // Default IV rank
+          
+          // Pass through data state indicators for demo mode detection
+          data_state: metrics.data_state,
+          warning: metrics.warning,
+          demo_notice: metrics.demo_notice,
+          is_demo: metrics.is_demo,
+          last_updated: metrics.last_updated
         });
       }
     } catch (error) {
@@ -596,32 +606,7 @@ const TradingDashboard = React.memo(() => {
 
           {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-6">
-            {/* Plugin Status */}
-            <Card className="bg-gradient-to-br from-card to-card/50 border border-border/50 shadow-lg">
-              <CardHeader className="pb-4">
-                <CardTitle className="flex items-center gap-3 text-xl font-bold">
-                  <div className="p-2 bg-blue-500/20 rounded-lg">
-                    <Activity className="h-5 w-5 text-blue-400" />
-                  </div>
-                  <span>System Status</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
-                  {pluginStatus.map((plugin, index) => (
-                     <div key={index} className="bg-gradient-to-br from-background to-muted/30 p-4 rounded-xl border border-border/40 hover:border-border/80 transition-all duration-200 hover:shadow-md">
-                       <div className="flex items-center justify-between mb-3">
-                         <span className="font-semibold text-sm text-foreground">{plugin.name}</span>
-                         <div className={`h-3 w-3 rounded-full ${plugin.status === 'active' ? 'bg-emerald-400 shadow-lg shadow-emerald-400/50 animate-pulse' : 'bg-yellow-400 shadow-lg shadow-yellow-400/50'}`} />
-                       </div>
-                       <div className="text-xs text-muted-foreground mb-2 font-medium">{plugin.plugin}</div>
-                       <div className="text-xs text-muted-foreground/80">{plugin.lastUpdate}</div>
-                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
+            
             {/* Real-time Market Data and Charts */}
             <Card className="bg-gradient-to-br from-card to-card/50 border border-border/50 shadow-lg">
               <CardHeader className="pb-4">
@@ -787,7 +772,7 @@ const TradingDashboard = React.memo(() => {
             </LazyTabContent>
           </TabsContent>
 
-          {/* Trades Tab */}
+          {/* Trading → Execution Tab - Live trading opportunities from production strategies */}
           <TabsContent value="trades" className="space-y-6">
             {/* Data Source Warning */}
             {dataSourceInfo && (
@@ -852,6 +837,16 @@ const TradingDashboard = React.memo(() => {
               preload={preloadedTabs.has("risk")}
             >
               <LazyEnhancedRiskTab />
+            </LazyTabContent>
+          </TabsContent>
+
+          {/* Strategies Tab - Strategy Sandbox for creating and testing custom strategies */}
+          <TabsContent value="strategies" className="space-y-6">
+            <LazyTabContent 
+              isActive={activeTab === "strategies"}
+              preload={preloadedTabs.has("strategies")}
+            >
+              <StrategiesTab />
             </LazyTabContent>
           </TabsContent>
 
@@ -1017,6 +1012,11 @@ const TradingDashboard = React.memo(() => {
                 </CardContent>
               </Card>
             </div>
+          </TabsContent>
+
+          {/* System Status Tab */}
+          <TabsContent value="system-status" className="space-y-6">
+            <SystemStatus />
           </TabsContent>
 
           </TieredNavigation>

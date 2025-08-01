@@ -1,0 +1,92 @@
+{
+  "strategy_name": "ThetaCrop Weekly",
+  "strategy_type": "THETA_HARVESTING",
+  "strategy_id": "ThetaCropWeekly",
+  "description": "Weekly theta decay harvesting strategy using iron condors on high-volume ETFs",
+  "category": "Premium Collection",
+  
+  "environments": {
+    "test": {
+      "position_parameters": {
+        "target_dte_range": [7, 14],
+        "delta_target": 0.15,
+        "max_positions": 3,
+        "max_opportunities": 5,
+        "wing_widths": [5, 10, 15]
+      },
+      "universe": {
+        "universe_name": "thetacrop",
+        "primary_symbols": ["SPY", "QQQ", "IWM"],
+        "max_symbols": 3,
+        "min_volume": 1000000
+      },
+      "risk_management": {
+        "profit_target": 0.50,
+        "loss_limit": 2.00,
+        "max_position_size": 1000,
+        "position_sizing": "fixed"
+      }
+    },
+    "live": {
+      "position_parameters": {
+        "target_dte_range": [5, 21],
+        "delta_target": 0.20,
+        "max_positions": 10,
+        "max_opportunities": 15,
+        "wing_widths": [5, 10, 15, 20]
+      },
+      "universe": {
+        "universe_name": "etfs",
+        "primary_symbols": ["SPY", "QQQ", "IWM", "TLT", "GLD", "XLF", "XLE"],
+        "max_symbols": 10,
+        "min_volume": 5000000
+      },
+      "risk_management": {
+        "profit_target": 0.50,
+        "loss_limit": 2.00,
+        "max_position_size": 5000,
+        "position_sizing": "kelly"
+      }
+    }
+  },
+  
+  "shared_parameters": {
+    "entry_signals": {
+      "min_probability_profit": 0.65,
+      "min_credit_ratio": 0.15,
+      "max_iv_rank": 50,
+      "allow_bias": ["NEUTRAL"]
+    },
+    "exit_rules": {
+      "profit_target_percent": 50,
+      "loss_limit_percent": 200,
+      "time_decay_exit": 0.21,
+      "gamma_risk_exit": 0.10
+    },
+    "scoring": {
+      "base_probability_weight": 4.0,
+      "liquidity_weight": 2.0,
+      "credit_weight": 3.0,
+      "score_ceiling": 10.0,
+      "score_floor": 1.0
+    }
+  },
+  
+  "educational_content": {
+    "description": "ThetaCrop Weekly focuses on harvesting time decay (theta) from high-probability trades with weekly expiration cycles.",
+    "best_for": "Neutral market conditions with low to moderate volatility",
+    "risk_level": "MEDIUM",
+    "typical_trades": "Iron condors on ETFs with 7-21 DTE",
+    "key_metrics": ["Win rate", "Theta per day", "Risk/reward ratio"],
+    "market_outlook": "Range-bound or slow-moving markets"
+  },
+  
+  "metadata": {
+    "version": "2.0",
+    "created_by": "system",
+    "created_at": "2025-08-01T00:00:00Z",
+    "last_updated": "2025-08-01T00:00:00Z",
+    "tags": ["theta", "weekly", "iron_condor", "etf", "neutral"],
+    "complexity": "intermediate"
+  }
+}

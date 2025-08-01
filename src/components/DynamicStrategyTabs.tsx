@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Activity, TrendingUp, Target, Zap, Brain, AlertTriangle, Timer } from 'lucide-react';
+import { Loader2, Activity, TrendingUp, Target, Zap, Brain, AlertTriangle, Timer, RefreshCw } from 'lucide-react';
 import { useStrategies, StrategyMetadata } from '@/contexts/StrategyContext';
 import { TradeCard } from '@/components/TradeCard';
 import { paperTradingService } from '@/services/paperTrading';
@@ -93,13 +94,17 @@ interface AllOpportunitiesViewProps {
   opportunitiesByStrategy: Record<string, { opportunities: TradeOpportunity[] }>;
   loadingOpportunities: Record<string, boolean>;
   onTradeExecuted?: (pnl: number) => void;
+  onRefresh?: () => void;
+  isRefreshing?: boolean;
 }
 
 const AllOpportunitiesView: React.FC<AllOpportunitiesViewProps> = ({
   strategies,
   opportunitiesByStrategy,
   loadingOpportunities,
-  onTradeExecuted
+  onTradeExecuted,
+  onRefresh,
+  isRefreshing = false
 }) => {
   const [executingTrades, setExecutingTrades] = useState<Set<string>>(new Set());
   const { toast } = useToast();
@@ -167,7 +172,35 @@ const AllOpportunitiesView: React.FC<AllOpportunitiesViewProps> = ({
         }
 
         if (uniqueOpportunities.length === 0) {
-          return null; // Don't show strategies with no opportunities
+          return (
+            <div key={strategy.id} className="space-y-4">
+              <div className="flex items-center justify-between border-b pb-2">
+                <div className="flex items-center space-x-3">
+                  {getCategoryIcon(strategy.category)}
+                  <h3 className="text-lg font-semibold">{strategy.name}</h3>
+                  <Badge variant="outline">0 opportunities</Badge>
+                  <Badge className={getStatusColor(strategy.status)}>{strategy.status}</Badge>
+                </div>
+              </div>
+              
+              <Alert>
+                <Activity className="h-4 w-4" />
+                <AlertDescription className="flex items-center justify-between">
+                  <span>No opportunities found for current market conditions.</span>
+                  <Button 
+                    size="sm" 
+                    variant="ghost" 
+                    onClick={onRefresh}
+                    disabled={isRefreshing}
+                    className="ml-2"
+                  >
+                    <RefreshCw className={`h-3 w-3 mr-1 ${isRefreshing ? 'animate-spin' : ''}`} />
+                    Scan
+                  </Button>
+                </AlertDescription>
+              </Alert>
+            </div>
+          );
         }
 
         return (
@@ -274,8 +307,8 @@ const StrategyOpportunitiesView: React.FC<StrategyOpportunitiesViewProps> = ({
     return (
       <Alert>
         <Activity className="h-4 w-4" />
-        <AlertDescription>
-          No opportunities found for current market conditions.
+        <AlertDescription className="flex items-center justify-between">
+          <span>No opportunities found for current market conditions.</span>
         </AlertDescription>
       </Alert>
     );
@@ -346,10 +379,34 @@ export const DynamicStrategyTabs: React.FC<DynamicStrategyTabsProps> = ({
     getStrategiesByCategory,
     getAllOpportunities,
     getOpportunitiesByCategory,
-    getStrategyOpportunities
+    getStrategyOpportunities,
+    refreshAllOpportunities
   } = useStrategies();
 
   const [activeTab, setActiveTab] = useState('all');
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const { toast } = useToast();
+
+  const handleRefresh = async () => {
+    try {
+      setIsRefreshing(true);
+      await refreshAllOpportunities();
+      toast({
+        title: "Opportunities Refreshed",
+        description: "All strategies have been scanned for new opportunities.",
+        duration: 3000,
+      });
+    } catch (error) {
+      toast({
+        title: "Refresh Failed",
+        description: "Failed to refresh opportunities. Please try again.",
+        variant: "destructive",
+        duration: 5000,
+      });
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   // Trade type categories
   const tradeTypeCategories = ['high_probability', 'quick_scalps', 'swing_trades', 'volatility_plays'];
@@ -413,6 +470,30 @@ export const DynamicStrategyTabs: React.FC<DynamicStrategyTabsProps> = ({
 
   return (
     <div className="space-y-6">
+      {/* Header with refresh button */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-3">
+          <Activity className="h-6 w-6 text-primary" />
+          <div>
+            <h2 className="text-xl font-semibold">Trading Opportunities</h2>
+            <p className="text-sm text-muted-foreground">
+              {allOpportunities.length} opportunities across {strategies.length} strategies
+            </p>
+          </div>
+        </div>
+        
+        <Button 
+          onClick={handleRefresh} 
+          disabled={isRefreshing}
+          variant="outline"
+          size="sm"
+          className="flex items-center space-x-2"
+        >
+          <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+          <span>{isRefreshing ? 'Scanning...' : 'Refresh All'}</span>
+        </Button>
+      </div>
+
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         {/* Two-row tab layout with proper TabsList structure */}
         <TabsList className="h-auto p-2 bg-muted/30">
@@ -507,6 +588,8 @@ export const DynamicStrategyTabs: React.FC<DynamicStrategyTabsProps> = ({
             opportunitiesByStrategy={opportunitiesByStrategy}
             loadingOpportunities={loadingOpportunities}
             onTradeExecuted={onTradeExecuted}
+            onRefresh={handleRefresh}
+            isRefreshing={isRefreshing}
           />
         </TabsContent>
 

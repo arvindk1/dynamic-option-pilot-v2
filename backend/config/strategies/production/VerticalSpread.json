@@ -1,0 +1,122 @@
+{
+  "module": "strategies.vertical_spread_plugin",
+  "strategy_name": "Vertical Spread",
+  "strategy_type": "VERTICAL_SPREAD",
+  "description": "Buy one option and sell another at a different strike - directional strategy with defined risk",
+  
+  "subtypes": {
+    "available": ["BULL_CALL", "BEAR_PUT", "BULL_PUT", "BEAR_CALL"],
+    "preferred": ["BULL_CALL", "BEAR_PUT"]
+  },
+  
+  "universe": {
+    "symbol_types": ["STOCK", "ETF"],
+    "min_market_cap": 5000000000,
+    "min_avg_volume": 2000000,
+    "min_option_volume": 1000,
+    "liquid_strikes_required": true
+  },
+  
+  "position_parameters": {
+    "max_debit_pct_equity": 0.03,
+    "min_width": 5,
+    "max_width": 20,
+    "max_opportunities": 5
+  },
+  
+  "entry_signals": {
+    "min_bias_strength": "MODERATE",
+    "max_volatility": 0.35,
+    "allowed_bias": ["BULLISH", "BEARISH"],
+    "forbidden_bias": ["NEUTRAL"]
+  },
+  
+  "strike_selection": {
+    "delta_buy": 0.25,
+    "delta_sell": 0.15,
+    "spread_widths": [5, 10, 15, 20],
+    "min_risk_reward_ratio": 1.5,
+    "max_risk_reward_ratio": 4.0
+  },
+  
+  "timing": {
+    "dte_range": [7, 45],
+    "optimal_dte": [21, 35],
+    "avoid_earnings": true
+  },
+  
+  "exit_rules": {
+    "profit_targets": [
+      { 
+        "level": 0.50, 
+        "action": "CLOSE_SPREAD", 
+        "priority": 90,
+        "description": "Close at 50% of max profit"
+      },
+      { 
+        "level": 0.75, 
+        "action": "CLOSE_SPREAD", 
+        "priority": 85,
+        "description": "Close at 75% of max profit if close to expiration"
+      }
+    ],
+    "stop_loss_rules": [
+      { 
+        "type": "PERCENTAGE", 
+        "trigger": -0.50, 
+        "action": "CLOSE_SPREAD", 
+        "priority": 100,
+        "description": "Close at 50% of max loss"
+      }
+    ],
+    "time_exits": [
+      { 
+        "condition": "dte_less_than", 
+        "value": 2, 
+        "action": "CLOSE_SPREAD", 
+        "priority": 80,
+        "description": "Close 2 days before expiration"
+      }
+    ],
+    "technical_exits": [
+      {
+        "condition": "bias_reversal",
+        "action": "CLOSE_SPREAD",
+        "priority": 95,
+        "description": "Close if directional bias reverses"
+      }
+    ]
+  },
+  
+  "scoring": {
+    "risk_reward_weight": 0.5,
+    "probability_weight": 0.3,
+    "cost_weight": 0.2,
+    "bias_strength_multiplier": {
+      "STRONG": 1.3,
+      "MODERATE": 1.0,
+      "WEAK": 0.7
+    },
+    "score_floor": 1.0,
+    "score_ceiling": 10.0,
+    "round_decimals": 1
+  },
+  
+  "risk_management": {
+    "max_allocation_percentage": 25,
+    "max_single_spread_cost": 1000,
+    "correlation_limit": 0.7,
+    "sector_concentration_limit": 0.4
+  },
+  
+  "educational_content": {
+    "best_for": "Directional trades with limited risk and defined profit potential",
+    "when_to_use": "Moderate to strong directional bias with controlled risk",
+    "profit_mechanism": "Benefit from directional movement while limiting downside",
+    "risk_level": "MEDIUM",
+    "typical_duration": "21-35 days",
+    "max_profit": "Spread width minus net debit paid",
+    "max_loss": "Net debit paid (limited risk)",
+    "breakeven": "Long strike +/- net debit (calls/puts)"
+  }
+}

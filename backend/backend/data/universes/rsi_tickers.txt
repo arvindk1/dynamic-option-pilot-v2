@@ -1,0 +1,24 @@
+# RSI Mean-Reversion Strategy Universe
+# Format: TICKER  # Description
+# Edit this file to add/remove tickers
+
+SPY   # S&P 500 ETF
+QQQ   # Nasdaq-100 ETF
+IWM   # Russell 2000 ETF
+DIA   # Dow-30 ETF
+GLD   # Gold ETF
+XLF   # Financial-sector ETF
+XLK   # Technology-sector ETF
+XLE   # Energy-sector ETF
+TLT   # 20-Year Treasury ETF
+AAPL  # Apple Inc.
+MSFT  # Microsoft Corp.
+AMZN  # Amazon.com Inc.
+NVDA  # NVIDIA Corp.
+TSLA  # Tesla Inc.
+GOOGL # Alphabet Inc.-A
+META  # Meta Platforms Inc.
+AMD   # Advanced Micro Devices
+NFLX  # Netflix Inc.
+JPM   # JPMorgan Chase & Co.
+PLTR  # Palantir Technologies

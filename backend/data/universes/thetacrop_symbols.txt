@@ -1,0 +1,22 @@
+# ThetaCrop Weekly Strategy Universe
+# High-volume, liquid ETFs suitable for weekly iron condor trading
+# Format: TICKER  # Description
+
+# Core ETFs (Primary targets)
+SPY   # S&P 500 ETF - Primary target for theta harvesting
+QQQ   # Nasdaq-100 ETF - High options volume
+IWM   # Russell 2000 ETF - Good volatility for condors
+
+# Additional Liquid ETFs
+TLT   # 20+ Year Treasury Bond ETF - Interest rate plays
+GLD   # Gold ETF - Commodity exposure
+XLF   # Financial Select Sector SPDR - Financial sector
+XLE   # Energy Select Sector SPDR - Energy sector
+XLK   # Technology Select Sector SPDR - Tech sector  
+XLV   # Health Care Select Sector SPDR - Healthcare sector
+XLI   # Industrial Select Sector SPDR - Industrial sector
+
+# High-Volume Individual ETFs
+EEM   # Emerging Markets ETF - International exposure
+VTI   # Total Stock Market ETF - Broad market
+ARKK  # ARK Innovation ETF - Growth/innovation

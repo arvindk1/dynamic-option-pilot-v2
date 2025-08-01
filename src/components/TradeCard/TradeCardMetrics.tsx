@@ -82,7 +82,7 @@ export const TradeCardMetrics: React.FC<TradeCardMetricsProps> = React.memo(({ t
   }, [trade.bias]);
 
   const riskColor = useMemo(() => {
-    switch (trade.risk_level.toUpperCase()) {
+    switch ((trade.risk_level || 'MEDIUM').toUpperCase()) {
       case 'LOW': return 'bg-green-100 text-green-800';
       case 'MEDIUM': return 'bg-yellow-100 text-yellow-800';
       case 'HIGH': return 'bg-red-100 text-red-800';
@@ -137,11 +137,11 @@ export const TradeCardMetrics: React.FC<TradeCardMetricsProps> = React.memo(({ t
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm text-muted-foreground">Risk Level</span>
             <Badge className={riskColor}>
-              {trade.risk_level}
+              {trade.risk_level || 'MEDIUM'}
             </Badge>
           </div>
           <div className="text-xs text-muted-foreground">
-            Max profit: ${trade.max_profit === 999.99 ? 'Unlimited' : (trade.max_profit || 0).toFixed(2)}
+            Max profit: ${trade.max_profit === 999.99 ? 'Unlimited' : (trade.max_profit || trade.premium || 0).toFixed(2)}
           </div>
         </div>
         

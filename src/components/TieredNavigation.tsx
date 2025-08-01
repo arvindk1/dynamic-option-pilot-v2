@@ -9,7 +9,9 @@ import {
   Settings,
   Zap,
   Shield,
-  DollarSign
+  DollarSign,
+  FlaskConical,
+  Activity
 } from 'lucide-react';
 
 interface TieredNavigationProps {
@@ -63,10 +65,17 @@ const mainTabs: MainTab[] = [
     ]
   },
   {
+    id: 'strategies',
+    label: 'Strategies',
+    icon: <FlaskConical className="h-4 w-4" />,
+    directTab: 'strategies'
+  },
+  {
     id: 'tools',
     label: 'Tools',
     icon: <Settings className="h-4 w-4" />,
     subTabs: [
+      { value: 'system-status', label: 'System Status', icon: <Activity className="h-4 w-4" /> },
       { value: 'config', label: 'Settings' }
     ]
   }

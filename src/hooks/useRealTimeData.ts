@@ -131,8 +131,8 @@ export const useRealTimeData = () => {
       setAccountValue(metrics.account_balance || 0);
     } catch (error) {
       console.error('Failed to load account data:', error);
-      // Fallback to demo account value
-      setAccountValue(100000); // $100k demo account
+      // No fallback - leave as 0 to indicate data unavailable
+      setAccountValue(0);
     }
   }, []);
 
@@ -152,22 +152,8 @@ export const useRealTimeData = () => {
       }
     } catch (error) {
       console.error('Failed to load performance data:', error);
-      // Fallback to demo performance data
-      const demoData = [];
-      const today = new Date();
-      for (let i = 29; i >= 0; i--) {
-        const date = new Date(today);
-        date.setDate(date.getDate() - i);
-        const dailyPnl = (Math.random() - 0.5) * 500; // Random P&L between -250 and 250
-        const cumulative = i === 29 ? dailyPnl : demoData[demoData.length - 1]?.cumulative + dailyPnl || dailyPnl;
-        
-        demoData.push({
-          date: date.toISOString().slice(0, 10),
-          pnl: parseFloat(dailyPnl.toFixed(2)),
-          cumulative: parseFloat(cumulative.toFixed(2))
-        });
-      }
-      setPerformanceData(demoData);
+      // No fallback - leave empty to indicate data unavailable
+      setPerformanceData([]);
     }
   }, []);
   

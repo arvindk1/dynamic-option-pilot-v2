@@ -13,14 +13,17 @@ import {
   ChevronDown,
   ChevronUp,
   BarChart3,
-  Zap
+  Zap,
+  Calendar
 } from 'lucide-react';
 
 interface DailyCommentary {
   date: string;
+  display_date?: string;
   timestamp: string;
   headline: string;
   market_overview: string;
+  market_session?: string;
   key_themes: string[];
   technical_outlook: string;
   volatility_watch: string;
@@ -35,6 +38,13 @@ interface DailyCommentary {
     };
   };
   risk_factors: string[];
+  earnings_preview?: string[];
+  top20_focus?: string[];
+  next_update?: string;
+  data_state?: string;
+  warning?: string;
+  demo_notice?: string;
+  is_demo?: boolean;
 }
 
 interface MarketCommentaryProps {
@@ -49,10 +59,14 @@ export const MarketCommentary: React.FC<MarketCommentaryProps> = ({ compact = fa
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(!compact);
 
-  const fetchCommentary = async () => {
+  const fetchCommentary = async (forceRefresh: boolean = false) => {
     try {
       setLoading(true);
-      const response = await fetch('/api/market-commentary/daily-commentary');
+      const url = forceRefresh 
+        ? '/api/market-commentary/daily-commentary?force_refresh=true'
+        : '/api/market-commentary/daily-commentary';
+      
+      const response = await fetch(url);
       if (response.ok) {
         const data = await response.json();
         setCommentary(data);
@@ -65,6 +79,24 @@ export const MarketCommentary: React.FC<MarketCommentaryProps> = ({ compact = fa
       console.error('Market commentary error:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    try {
+      // Trigger server-side refresh first
+      const refreshResponse = await fetch('/api/market-commentary/refresh', { method: 'POST' });
+      if (refreshResponse.ok) {
+        // Then fetch the updated commentary
+        await fetchCommentary(true);
+      } else {
+        console.warn('Server refresh failed, fetching anyway');
+        await fetchCommentary(true);
+      }
+    } catch (error) {
+      console.error('Error refreshing commentary:', error);
+      // Still try to fetch even if refresh failed
+      await fetchCommentary(true);
     }
   };
 
@@ -113,7 +145,7 @@ export const MarketCommentary: React.FC<MarketCommentaryProps> = ({ compact = fa
               Market Commentary
             </CardTitle>
             <Badge variant="outline" className="text-xs">
-              {new Date(commentary.date).toLocaleDateString()}
+              {commentary.display_date || new Date(commentary.date).toLocaleDateString()}
             </Badge>
           </div>
         </CardHeader>
@@ -167,7 +199,7 @@ export const MarketCommentary: React.FC<MarketCommentaryProps> = ({ compact = fa
             </CardTitle>
             <div className="flex items-center gap-2">
               <Badge variant="outline">
-                {new Date(commentary.date).toLocaleDateString('en-US', {
+                {commentary.display_date || new Date(commentary.date).toLocaleDateString('en-US', {
                   weekday: 'long',
                   year: 'numeric',
                   month: 'long',
@@ -194,7 +226,7 @@ export const MarketCommentary: React.FC<MarketCommentaryProps> = ({ compact = fa
                   )}
                 </Button>
               )}
-              <Button variant="outline" size="sm" onClick={fetchCommentary}>
+              <Button variant="outline" size="sm" onClick={handleRefresh}>
                 <RefreshCw className="h-4 w-4 mr-1" />
                 Refresh
               </Button>
@@ -223,7 +255,33 @@ export const MarketCommentary: React.FC<MarketCommentaryProps> = ({ compact = fa
       </Card>
 
       {expanded && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="space-y-6">
+          {/* Earnings Preview Section */}
+          {commentary.earnings_preview && commentary.earnings_preview.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Calendar className="h-5 w-5" />
+                  Earnings Preview - TOP 20 Stocks
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {commentary.earnings_preview.map((earning, index) => (
+                    <div key={index} className="flex items-center gap-2 p-2 bg-muted/50 rounded">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                      <span className="text-sm">{earning}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-3 text-xs text-muted-foreground">
+                  * Earnings data from TOP 20 universe monitoring
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Key Themes */}
         <Card>
           <CardHeader>
@@ -347,6 +405,7 @@ export const MarketCommentary: React.FC<MarketCommentaryProps> = ({ compact = fa
           </ul>
         </CardContent>
         </Card>
+          </div>
         </div>
       )}
     </div>

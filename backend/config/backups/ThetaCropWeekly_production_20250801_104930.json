@@ -1,0 +1,123 @@
+{
+  "module": "strategies.theta_crop_weekly",
+  "strategy_name": "ThetaCrop Weekly",
+  "strategy_type": "THETA_HARVESTING",
+  "description": "Weekly theta capture using iron condors on high-volume ETFs with tight delta management",
+  
+  "universe": {
+    "universe_file": "backend/data/universes/thetacrop_symbols.txt",
+    "universe_name": "thetacrop",
+    "symbol_type": "ETF",
+    "max_symbols": 10,
+    "symbol_selection": "top_by_volume",
+    "min_volume": 1000000,
+    "min_open_interest": 10000
+  },
+  
+  "timing": {
+    "entry_day": 3,
+    "entry_time": "11:30",
+    "scanning_hours_et": { 
+      "start_hour": 9, 
+      "end_hour": 20 
+    }
+  },
+  
+  "position_parameters": {
+    "target_dte_range": [5, 6, 7, 8, 9, 10],
+    "delta_target": 0.20,
+    "wing_widths": [2, 3, 4],
+    "min_credit_ratio": 0.15,
+    "position_size_per_3k": 1,
+    "max_positions": 5
+  },
+  
+  "entry_signals": {
+    "min_credit_to_width_ratio": 0.05,
+    "dte_range_days": [1, 30],
+    "max_net_delta_abs": 1.0,
+    "min_credit_amount": 0.01,
+    "min_volatility_rank": 0,
+    "allow_bias": ["NEUTRAL"],
+    "required_market_conditions": ["LOW_VOLATILITY", "RANGE_BOUND"]
+  },
+  
+  "exit_rules": {
+    "profit_targets": [
+      { 
+        "level": 0.50, 
+        "action": "CLOSE_ALL", 
+        "percentage": 1.0, 
+        "priority": 90,
+        "description": "Take profits at 50% of max profit"
+      }
+    ],
+    "stop_loss_rules": [
+      { 
+        "type": "PERCENTAGE", 
+        "trigger": -0.30, 
+        "action": "CLOSE_ALL", 
+        "priority": 100,
+        "description": "Stop loss at 30% of max loss"
+      }
+    ],
+    "time_exits": [
+      { 
+        "condition": "dte_less_than", 
+        "value": 1, 
+        "action": "CLOSE_ALL", 
+        "priority": 85,
+        "description": "Close all positions 1 day before expiration"
+      }
+    ],
+    "assignment_protection": [
+      {
+        "type": "DELTA_BREACH",
+        "short_call_delta_max": 0.25,
+        "short_put_delta_min": -0.25,
+        "action": "CLOSE_ALL",
+        "priority": 95,
+        "description": "Close if delta breach indicates assignment risk"
+      }
+    ],
+    "monitoring_frequency_seconds": 300
+  },
+  
+  "scoring": {
+    "base_probability_weight": 4.0,
+    "theta_bonus": [
+      {"days_to_expiry_lt": 7, "bonus": 2.0},
+      {"days_to_expiry_lt": 10, "bonus": 1.5},
+      {"default": 1.0}
+    ],
+    "credit_ratio_bonus": {
+      "multiplier": 3.0,
+      "min_ratio": 0.15,
+      "cap": 2.0
+    },
+    "volatility_bonus": [
+      {"iv_rank_lt": 30, "bonus": 1.5},
+      {"iv_rank_lt": 50, "bonus": 1.2},
+      {"default": 1.0}
+    ],
+    "score_ceiling": 10.0,
+    "score_floor": 3.0,
+    "round_decimals": 1
+  },
+
+  "risk_management": {
+    "max_allocation_percentage": 15,
+    "correlation_limit": 0.7,
+    "var_limit_percentage": 2.0
+  },
+  
+  "educational_content": {
+    "best_for": "Consistent income generation through time decay",
+    "when_to_use": "Low to moderate volatility environments with range-bound markets",
+    "profit_mechanism": "Collect premium and benefit from theta decay",
+    "risk_level": "LOW-MEDIUM",
+    "typical_duration": "5-10 days",
+    "max_profit": "Total premium collected",
+    "max_loss": "Wing width minus premium collected"
+  }
+}

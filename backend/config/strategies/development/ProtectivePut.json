@@ -1,0 +1,101 @@
+{
+  "module": "strategies.protective_put_plugin",
+  "strategy_name": "Protective Put",
+  "strategy_type": "PROTECTIVE_PUT",
+  "description": "Own stock and buy a put for downside protection - insurance strategy",
+  
+  "universe": {
+    "symbol_types": ["STOCK", "ETF"],
+    "min_market_cap": 2000000000,
+    "min_avg_volume": 1000000,
+    "min_option_volume": 500,
+    "volatile_stocks_preferred": true,
+    "exclude_low_beta": false
+  },
+  
+  "position_parameters": {
+    "contracts_per_100_shares": 1,
+    "max_premium_pct_equity": 0.02,
+    "min_protection_level": 0.90,
+    "max_protection_cost": 0.05
+  },
+  
+  "entry_signals": {
+    "min_bias": "BULLISH",
+    "max_drawdown_pct": 0.05,
+    "volatility_spike_protection": true,
+    "earnings_protection": true
+  },
+  
+  "put_selection": {
+    "delta_target": 0.30,
+    "min_dte": 7,
+    "max_dte": 60,
+    "preferred_moneyness": "OTM",
+    "protection_levels": [0.85, 0.90, 0.95]
+  },
+  
+  "exit_rules": {
+    "profit_targets": [
+      { 
+        "level": 0.50, 
+        "action": "CLOSE_PUT", 
+        "priority": 90,
+        "description": "Close put when 50% loss recovered"
+      }
+    ],
+    "stop_loss_rules": [
+      { 
+        "type": "PERCENTAGE", 
+        "trigger": -0.50, 
+        "action": "CLOSE_PUT", 
+        "priority": 100,
+        "description": "Close put if it loses 50% of value"
+      }
+    ],
+    "time_exits": [
+      { 
+        "condition": "dte_less_than", 
+        "value": 3, 
+        "action": "CLOSE_PUT", 
+        "priority": 80,
+        "description": "Close put 3 days before expiration"
+      }
+    ],
+    "protection_achieved": [
+      {
+        "condition": "stock_above_strike_plus_premium",
+        "action": "CLOSE_PUT",
+        "priority": 75,
+        "description": "Close when stock well above breakeven"
+      }
+    ]
+  },
+  
+  "scoring": {
+    "cost_protection_weight": 0.7,
+    "time_decay_weight": 0.3,
+    "volatility_protection_bonus": 0.2,
+    "liquidity_weight": 0.2,
+    "score_floor": 1.0,
+    "score_ceiling": 10.0,
+    "round_decimals": 1
+  },
+  
+  "risk_management": {
+    "max_allocation_percentage": 20,
+    "max_insurance_cost_percentage": 3,
+    "portfolio_correlation_limit": 0.8
+  },
+  
+  "educational_content": {
+    "best_for": "Downside protection on long stock positions",
+    "when_to_use": "Before earnings, market uncertainty, or volatility spikes",
+    "profit_mechanism": "Put gains offset stock losses below strike price",
+    "risk_level": "LOW",
+    "typical_duration": "30-60 days",
+    "max_profit": "Unlimited stock upside minus put premium",
+    "max_loss": "Stock value down to put strike minus premium paid",
+    "insurance_cost": "Put premium acts as insurance premium"
+  }
+}

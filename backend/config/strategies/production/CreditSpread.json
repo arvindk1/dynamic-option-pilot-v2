@@ -1,0 +1,100 @@
+{
+  "module": "strategies.credit_spread_plugin",
+  "strategy_name": "Credit Spread",
+  "strategy_type": "CREDIT_SPREAD",
+  "description": "Income generation through credit spreads with defined risk and high probability of profit",
+  
+  "universe": {
+    "symbol_types": ["STOCK", "ETF"],
+    "min_market_cap": 5000000000,
+    "min_avg_volume": 2000000,
+    "min_option_volume": 500,
+    "liquid_underlyings_only": true
+  },
+  
+  "position_parameters": {
+    "delta_targets": [0.05, 0.10, 0.15, 0.20],
+    "min_dte": 14,
+    "max_dte": 45,
+    "min_credit": 0.05,
+    "preferred_strikes": [5, 10],
+    "expiration_limit": 4,
+    "max_opportunities": 6
+  },
+  
+  "strike_selection": {
+    "strike_spacing_rules": [
+      { "price_lt": 50,   "spacing": 2.5 },
+      { "price_lt": 100,  "spacing": 5   },
+      { "price_lt": 200,  "spacing": 5   },
+      { "price_lt": 1000, "spacing": 10  },
+      { "default": 25 }
+    ],
+    "spread_widths": [5, 10, 15, 20],
+    "min_credit_to_width_ratio": 0.20
+  },
+  
+  "entry_signals": {
+    "allowed_bias": ["BULLISH", "NEUTRAL", "BEARISH"],
+    "allowed_strength": ["MODERATE", "STRONG", "WEAK"],
+    "allowed_volatility": ["NORMAL", "HIGH"],
+    "forbidden_combinations": [
+      { "bias": "NEUTRAL", "volatility": "HIGH" }
+    ]
+  },
+  
+  "scoring": {
+    "probability_weight": 3.0,
+    "ev_multiplier": 10.0,
+    "risk_reward_multiplier": 4.0,
+    "risk_reward_cap": 2.0,
+    "time_decay_weight": 1.0,
+    "signal_strength_multiplier": {
+      "STRONG":   1.2,
+      "MODERATE": 1.0,
+      "WEAK":     0.8
+    },
+    "volatility_multiplier": {
+      "HIGH":   1.1,
+      "NORMAL": 1.0,
+      "LOW":    0.9
+    },
+    "score_floor": 1.0,
+    "score_ceiling": 10.0,
+    "round_decimals": 1
+  },
+  
+  "risk_management": {
+    "max_allocation_percentage": 25,
+    "max_single_position_size": 5,
+    "correlation_limit": 0.8,
+    "sector_concentration_limit": 0.4
+  },
+  
+  "exit_rules": {
+    "profit_targets": [
+      { "level": 0.25, "action": "CLOSE_HALF", "percentage": 0.5, "priority": 75 },
+      { "level": 0.50, "action": "CLOSE_ALL", "percentage": 1.0, "priority": 85 }
+    ],
+    "stop_loss_rules": [
+      { "type": "PERCENTAGE", "trigger": -2.0, "action": "CLOSE_ALL", "priority": 100 }
+    ],
+    "time_exits": [
+      { "condition": "dte_less_than", "value": 7, "action": "CLOSE_ALL", "priority": 90 }
+    ],
+    "delta_management": [
+      { "condition": "delta_breach", "threshold": 0.30, "action": "CLOSE_ALL", "priority": 95 }
+    ]
+  },
+  
+  "educational_content": {
+    "best_for": "Income generation with defined risk",
+    "when_to_use": "Neutral to mildly directional markets with elevated volatility",
+    "profit_mechanism": "Collect premium and benefit from time decay",
+    "risk_profile": "Medium – limited defined risk",
+    "duration_days": [14, 45],
+    "max_profit": "Premium collected",
+    "max_loss": "Spread width minus premium collected",
+    "breakeven": "Short strike +/- premium collected"
+  }
+}
