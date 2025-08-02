@@ -33,3 +33,5 @@ backend/scripts/venv/
 
 node_modules/
 dist/
+
+backend/dev.db
