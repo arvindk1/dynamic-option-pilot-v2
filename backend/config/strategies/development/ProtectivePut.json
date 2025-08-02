@@ -5,6 +5,7 @@
   "description": "Own stock and buy a put for downside protection - insurance strategy",
   
   "universe": {
+    "primary_symbols": ["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA"],
     "symbol_types": ["STOCK", "ETF"],
     "min_market_cap": 2000000000,
     "min_avg_volume": 1000000,
@@ -14,6 +15,9 @@
   },
   
   "position_parameters": {
+    "target_dtes": [30, 45, 60],
+    "protection_level": 0.95,
+    "max_opportunities": 3,
     "contracts_per_100_shares": 1,
     "max_premium_pct_equity": 0.02,
     "min_protection_level": 0.90,

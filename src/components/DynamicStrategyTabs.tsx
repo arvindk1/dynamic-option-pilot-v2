@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Activity, TrendingUp, Target, Zap, Brain, AlertTriangle, Timer, RefreshCw } from 'lucide-react';
+import { Loader2, Activity, TrendingUp, Target, Zap, Brain, AlertTriangle, Timer, RefreshCw, DollarSign, Shield } from 'lucide-react';
 import { useStrategies, StrategyMetadata } from '@/contexts/StrategyContext';
 import { TradeCard } from '@/components/TradeCard';
 import { paperTradingService } from '@/services/paperTrading';
@@ -67,6 +67,19 @@ interface TradeTypeCategories {
 
 const getCategoryIcon = (category: string) => {
   switch (category) {
+    // Professional strategy categories
+    case 'income_generation':
+      return <DollarSign className="h-4 w-4 text-green-500" />;
+    case 'volatility_trading':
+      return <Activity className="h-4 w-4 text-blue-500" />;
+    case 'directional_strategies':
+      return <TrendingUp className="h-4 w-4 text-purple-500" />;
+    case 'risk_management':
+      return <Shield className="h-4 w-4 text-orange-500" />;
+    case 'advanced_strategies':
+      return <Brain className="h-4 w-4 text-red-500" />;
+    
+    // Legacy categories  
     case 'technical_analysis':
       return <TrendingUp className="h-4 w-4" />;
     case 'volatility_harvesting':
@@ -174,31 +187,45 @@ const AllOpportunitiesView: React.FC<AllOpportunitiesViewProps> = ({
         if (uniqueOpportunities.length === 0) {
           return (
             <div key={strategy.id} className="space-y-4">
-              <div className="flex items-center justify-between border-b pb-2">
+              <div className="flex items-center justify-between border-b pb-3">
                 <div className="flex items-center space-x-3">
                   {getCategoryIcon(strategy.category)}
-                  <h3 className="text-lg font-semibold">{strategy.name}</h3>
-                  <Badge variant="outline">0 opportunities</Badge>
+                  <div>
+                    <h3 className="text-lg font-semibold text-muted-foreground">{strategy.name}</h3>
+                    <p className="text-xs text-muted-foreground">{strategy.description}</p>
+                  </div>
+                  <Badge variant="outline" className="text-muted-foreground">0 opportunities</Badge>
                   <Badge className={getStatusColor(strategy.status)}>{strategy.status}</Badge>
                 </div>
               </div>
               
-              <Alert>
-                <Activity className="h-4 w-4" />
-                <AlertDescription className="flex items-center justify-between">
-                  <span>No opportunities found for current market conditions.</span>
-                  <Button 
-                    size="sm" 
-                    variant="ghost" 
-                    onClick={onRefresh}
-                    disabled={isRefreshing}
-                    className="ml-2"
-                  >
-                    <RefreshCw className={`h-3 w-3 mr-1 ${isRefreshing ? 'animate-spin' : ''}`} />
-                    Scan
-                  </Button>
-                </AlertDescription>
-              </Alert>
+              <div className="bg-gradient-to-r from-muted/30 to-muted/10 p-4 rounded-lg border border-dashed border-muted-foreground/30">
+                <div className="flex items-start space-x-3">
+                  <Activity className="h-5 w-5 text-muted-foreground mt-0.5" />
+                  <div className="flex-1">
+                    <h4 className="text-sm font-medium text-muted-foreground mb-2">No Current Opportunities</h4>
+                    <p className="text-xs text-muted-foreground/80 mb-3">
+                      This strategy hasn't found any trades matching its criteria in current market conditions. 
+                      Market volatility, time decay, and liquidity requirements may be outside optimal ranges.
+                    </p>
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs text-muted-foreground">
+                        Last scan: {strategy.last_updated ? new Date(strategy.last_updated).toLocaleTimeString() : 'Never'}
+                      </div>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={onRefresh}
+                        disabled={isRefreshing}
+                        className="text-xs h-7 px-3"
+                      >
+                        <RefreshCw className={`h-3 w-3 mr-1 ${isRefreshing ? 'animate-spin' : ''}`} />
+                        Rescan
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           );
         }
@@ -330,6 +357,19 @@ const StrategyOpportunitiesView: React.FC<StrategyOpportunitiesViewProps> = ({
 
 const getCategoryColor = (category: string) => {
   switch (category) {
+    // Professional strategy categories with distinct color schemes
+    case 'income_generation':
+      return 'text-green-700 bg-green-50 border-green-200';
+    case 'volatility_trading':
+      return 'text-blue-700 bg-blue-50 border-blue-200';
+    case 'directional_strategies':
+      return 'text-purple-700 bg-purple-50 border-purple-200';
+    case 'risk_management':
+      return 'text-orange-700 bg-orange-50 border-orange-200';
+    case 'advanced_strategies':
+      return 'text-red-700 bg-red-50 border-red-200';
+    
+    // Legacy categories
     case 'technical_analysis':
       return 'text-blue-600 bg-blue-50';
     case 'volatility_harvesting':
@@ -470,28 +510,55 @@ export const DynamicStrategyTabs: React.FC<DynamicStrategyTabsProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Header with refresh button */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <Activity className="h-6 w-6 text-primary" />
+      {/* Enhanced Header with Strategy Overview */}
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center space-x-4">
+          <Activity className="h-7 w-7 text-primary" />
           <div>
-            <h2 className="text-xl font-semibold">Trading Opportunities</h2>
-            <p className="text-sm text-muted-foreground">
-              {allOpportunities.length} opportunities across {strategies.length} strategies
-            </p>
+            <h2 className="text-2xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
+              Trading Opportunities
+            </h2>
+            <div className="flex items-center space-x-4 mt-1">
+              <p className="text-sm text-muted-foreground">
+                <span className="font-semibold text-foreground">{allOpportunities.length}</span> opportunities across{' '}
+                <span className="font-semibold text-foreground">{strategies.length}</span> strategies
+              </p>
+              <div className="flex items-center space-x-2">
+                <Badge variant="secondary" className="text-xs">
+                  {strategies.filter(s => s.status === 'active').length} Active
+                </Badge>
+                <Badge variant="outline" className="text-xs">
+                  {categories.length} Categories
+                </Badge>
+              </div>
+            </div>
           </div>
         </div>
         
-        <Button 
-          onClick={handleRefresh} 
-          disabled={isRefreshing}
-          variant="outline"
-          size="sm"
-          className="flex items-center space-x-2"
-        >
-          <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-          <span>{isRefreshing ? 'Scanning...' : 'Refresh All'}</span>
-        </Button>
+        <div className="flex items-center space-x-2">
+          {/* Strategy Status Indicators */}
+          <div className="hidden md:flex items-center space-x-2 text-xs text-muted-foreground bg-muted/30 px-3 py-2 rounded-lg">
+            <div className="flex items-center space-x-1">
+              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+              <span>{strategies.filter(s => s.status === 'active').length} Active</span>
+            </div>
+            <div className="flex items-center space-x-1">
+              <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+              <span>{strategies.filter(s => s.status === 'inactive').length} Inactive</span>
+            </div>
+          </div>
+          
+          <Button 
+            onClick={handleRefresh} 
+            disabled={isRefreshing}
+            variant="outline"
+            size="sm"
+            className="flex items-center space-x-2 shadow-sm"
+          >
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            <span>{isRefreshing ? 'Scanning...' : 'Refresh All'}</span>
+          </Button>
+        </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -597,17 +664,57 @@ export const DynamicStrategyTabs: React.FC<DynamicStrategyTabsProps> = ({
           const categoryStrategies = getStrategiesByCategory(category);
           const categoryOpportunities = getOpportunitiesByCategory(category);
           
+          const getCategoryDescription = (cat: string) => {
+            switch (cat) {
+              case 'income_generation':
+                return 'Conservative strategies focused on consistent premium collection with high probability of profit. Ideal for generating steady income through theta decay.';
+              case 'volatility_trading':
+                return 'Market-neutral strategies that profit from volatility expansion or contraction. Best used when IV rank is at extremes.';
+              case 'directional_strategies':
+                return 'Strategies that benefit from price movement in a specific direction. Higher profit potential with directional market moves.';
+              case 'risk_management':
+                return 'Protective strategies designed to limit downside risk while maintaining upside potential. Essential for portfolio protection.';
+              case 'advanced_strategies':
+                return 'Sophisticated strategies requiring deeper market analysis and timing. Higher complexity with potentially higher returns.';
+              default:
+                return `${categoryStrategies.length} strategies in this category with ${categoryOpportunities.length} current opportunities.`;
+            }
+          };
+          
+          const getCategoryRiskLevel = (cat: string) => {
+            switch (cat) {
+              case 'income_generation': return 'Low-Medium Risk';
+              case 'volatility_trading': return 'Medium-High Risk';
+              case 'directional_strategies': return 'Medium Risk';
+              case 'risk_management': return 'Low Risk';
+              case 'advanced_strategies': return 'Medium-High Risk';
+              default: return 'Variable Risk';
+            }
+          };
+          
           return (
             <TabsContent key={category} value={category} className="mt-6">
-              <div className={`mb-6 p-4 rounded-lg border ${getCategoryColor(category)}`}>
-                <div className="flex items-center space-x-2 mb-2">
-                  {getCategoryIcon(category)}
-                  <h3 className="font-semibold capitalize">
-                    {category.replace('_', ' ')} Strategies
-                  </h3>
+              <div className={`mb-6 p-5 rounded-lg border-2 ${getCategoryColor(category)}`}>
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center space-x-3">
+                    {getCategoryIcon(category)}
+                    <div>
+                      <h3 className="text-lg font-bold capitalize">
+                        {category.replace('_', ' ')} Strategies
+                      </h3>
+                      <div className="flex items-center space-x-3 mt-1">
+                        <Badge variant="outline" className="text-xs">
+                          {getCategoryRiskLevel(category)}
+                        </Badge>
+                        <span className="text-sm opacity-80">
+                          {categoryStrategies.length} strategies • {categoryOpportunities.length} opportunities
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <p className="text-sm opacity-80">
-                  {categoryStrategies.length} strategies • {categoryOpportunities.length} opportunities
+                <p className="text-sm opacity-90 leading-relaxed">
+                  {getCategoryDescription(category)}
                 </p>
               </div>
               

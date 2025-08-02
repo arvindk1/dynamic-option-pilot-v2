@@ -55,6 +55,46 @@ interface StrategyProviderProps {
   children: ReactNode;
 }
 
+// Enhanced strategy categorization for professional trading interface
+const getCategoryFromStrategyType = (strategyId: string): string => {
+  // Professional trader-focused categories with clear risk/return profiles
+  const categoryMap: Record<string, string> = {
+    // Income Generation (Low-Medium Risk)
+    'ThetaCropWeekly': 'income_generation',
+    'CoveredCall': 'income_generation',
+    'CreditSpread': 'income_generation',
+    
+    // Volatility Trading (Medium-High Risk)
+    'IronCondor': 'volatility_trading',
+    'Straddle': 'volatility_trading',
+    'Strangle': 'volatility_trading',
+    'ButterflySpread': 'volatility_trading',
+    
+    // Directional Strategies (Medium Risk)
+    'VerticalSpread': 'directional_strategies',
+    'SingleOption': 'directional_strategies',
+    
+    // Risk Management (Low Risk)
+    'ProtectivePut': 'risk_management',
+    'Collar': 'risk_management',
+    
+    // Advanced Strategies (Medium-High Risk)
+    'CalendarSpread': 'advanced_strategies',
+    'RSICouponStrategy': 'advanced_strategies'
+  };
+  return categoryMap[strategyId] || 'other_strategies';
+};
+
+// Helper function to transform opportunity data for TradeCard compatibility
+const transformOpportunityForTradeCard = (opp: any) => ({
+  ...opp,
+  // Add missing fields that TradeCard expects
+  expiration: new Date(Date.now() + (opp.days_to_expiration * 24 * 60 * 60 * 1000)).toISOString().split('T')[0],
+  max_profit: Math.max(opp.premium * 100, opp.expected_value * 2), // Estimate max profit
+  trade_setup: `${opp.strategy_type} on ${opp.symbol}`,
+  risk_level: opp.probability_profit > 0.75 ? 'LOW' : opp.probability_profit > 0.5 ? 'MEDIUM' : 'HIGH'
+});
+
 export const StrategyProvider: React.FC<StrategyProviderProps> = ({ children }) => {
   const [strategies, setStrategies] = useState<StrategyMetadata[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
@@ -86,30 +126,54 @@ export const StrategyProvider: React.FC<StrategyProviderProps> = ({ children }) 
         };
       });
 
-      // Trigger quick-scan for all strategies concurrently
-      const scanPromises = strategies.map(async (strategy) => {
+      // Trigger quick-scan for active strategies concurrently
+      const activeStrategies = strategies.filter(s => s.status === 'active');
+      const scanPromises = activeStrategies.map(async (strategy) => {
         try {
-          const response = await fetch(`/api/strategies/${strategy.id}/quick-scan`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-          });
-          
-          if (response.ok) {
-            const scanResult = await response.json();
-            console.log(`${strategy.name}: ${scanResult.opportunities_found} opportunities`);
+          // Try to fetch existing opportunities first (faster)
+          const oppResponse = await fetch(`/api/strategies/${strategy.id}/opportunities`);
+          if (oppResponse.ok) {
+            const oppData = await oppResponse.json();
+            // Transform opportunities to match TradeCard interface
+            const transformedOpportunities = (oppData.opportunities || []).map(transformOpportunityForTradeCard);
             
-            // Now fetch the opportunities from the strategy's opportunities endpoint
-            const oppResponse = await fetch(`/api/strategies/${strategy.id}/opportunities`);
-            if (oppResponse.ok) {
-              const oppData = await oppResponse.json();
-              opportunitiesByStrategy[strategy.id] = {
-                strategy_id: strategy.id,
-                strategy_name: strategy.name,
-                opportunities: oppData.opportunities || [],
-                count: oppData.count || 0,
-                generated_at: oppData.generated_at || new Date().toISOString(),
-                market_conditions: oppData.market_conditions || {}
-              };
+            opportunitiesByStrategy[strategy.id] = {
+              strategy_id: strategy.id,
+              strategy_name: strategy.name,
+              opportunities: transformedOpportunities,
+              count: oppData.count || 0,
+              generated_at: oppData.generated_at || new Date().toISOString(),
+              market_conditions: oppData.market_conditions || {}
+            };
+            console.log(`${strategy.name}: ${oppData.count || 0} opportunities loaded`);
+          } else {
+            // If no cached opportunities, trigger a quick scan
+            console.log(`Triggering scan for ${strategy.name}...`);
+            const scanResponse = await fetch(`/api/strategies/${strategy.id}/quick-scan`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' }
+            });
+            
+            if (scanResponse.ok) {
+              const scanResult = await scanResponse.json();
+              console.log(`${strategy.name}: scan completed with ${scanResult.opportunities_found} opportunities`);
+              
+              // Fetch opportunities after scan
+              const oppResponse2 = await fetch(`/api/strategies/${strategy.id}/opportunities`);
+              if (oppResponse2.ok) {
+                const oppData2 = await oppResponse2.json();
+                // Transform opportunities to match TradeCard interface
+                const transformedOpportunities2 = (oppData2.opportunities || []).map(transformOpportunityForTradeCard);
+                
+                opportunitiesByStrategy[strategy.id] = {
+                  strategy_id: strategy.id,
+                  strategy_name: strategy.name,
+                  opportunities: transformedOpportunities2,
+                  count: oppData2.count || 0,
+                  generated_at: oppData2.generated_at || new Date().toISOString(),
+                  market_conditions: oppData2.market_conditions || {}
+                };
+              }
             }
           }
         } catch (error) {
@@ -148,11 +212,7 @@ export const StrategyProvider: React.FC<StrategyProviderProps> = ({ children }) 
       const opportunitiesByStrategy: Record<string, OpportunityData> = {};
       
       // Initialize all strategies with empty opportunities
-      const currentStrategies = strategies.length > 0 ? strategies : [
-        { id: 'iron_condor', name: 'Iron Condor' },
-        { id: 'put_spread', name: 'Put Credit Spread' },  
-        { id: 'covered_call', name: 'Covered Call' }
-      ];
+      const currentStrategies = strategies.length > 0 ? strategies : [];
       
       currentStrategies.forEach(strategy => {
         opportunitiesByStrategy[strategy.id] = {
@@ -165,17 +225,32 @@ export const StrategyProvider: React.FC<StrategyProviderProps> = ({ children }) 
         };
       });
       
-      // Distribute opportunities to strategies based on strategy_type or characteristics
+      // Distribute opportunities to strategies based on strategy_type
       allOpportunities.forEach((opp: any) => {
-        // Map opportunity strategy_type to strategy IDs
-        let targetStrategyId = 'IronCondor'; // default
+        // Map opportunity strategy_type directly to strategy ID
+        // The backend now provides strategy_type that matches strategy IDs
+        let targetStrategyId = opp.strategy_type || 'IronCondor'; // default fallback
         
-        if (opp.strategy_type === 'high_probability' || opp.probability_profit > 0.75) {
-          targetStrategyId = 'RSICouponStrategy'; // high probability strategy
-        } else if (opp.days_to_expiration > 30) {
-          targetStrategyId = 'CoveredCall'; // longer-term strategy
-        } else if (opp.strategy_type === 'volatility_play' || opp.liquidity_score > 8) {
-          targetStrategyId = 'IronCondor'; // volatility strategy
+        // If the exact strategy doesn't exist, try to find a matching one
+        if (!opportunitiesByStrategy[targetStrategyId]) {
+          // Try to map common strategy types to existing strategies
+          const strategyMapping: Record<string, string> = {
+            'high_probability': 'RSICouponStrategy',
+            'quick_scalp': 'SingleOption', 
+            'swing_trade': 'CoveredCall',
+            'volatility_play': 'IronCondor',
+            'iron_condor': 'IronCondor',
+            'put_spread': 'CreditSpread',
+            'covered_call': 'CoveredCall',
+            'theta_decay': 'ThetaCropWeekly',
+            'momentum': 'VerticalSpread',
+            'protective': 'ProtectivePut',
+            'neutral': 'ButterflySpread'
+          };
+          
+          targetStrategyId = strategyMapping[targetStrategyId.toLowerCase()] || 
+                           currentStrategies.find(s => s.status === 'active')?.id || 
+                           'IronCondor';
         }
         
         if (opportunitiesByStrategy[targetStrategyId]) {
@@ -204,19 +279,27 @@ export const StrategyProvider: React.FC<StrategyProviderProps> = ({ children }) 
       
       const strategiesData = await strategiesResponse.json();
       
-      // Enhanced strategy metadata with categories
+      // Enhanced strategy metadata with proper category mapping
       const enhancedStrategies = strategiesData.strategies.map((strategy: any) => ({
         ...strategy,
-        category: strategy.id === 'iron_condor' ? 'volatility_plays' :
-                 strategy.id === 'put_spread' ? 'high_probability' :
-                 strategy.id === 'covered_call' ? 'swing_trades' : 'other',
-        status: strategy.enabled ? 'active' : 'inactive',
+        // Use backend category if available, otherwise map from strategy ID
+        category: strategy.category || getCategoryFromStrategyType(strategy.id),
+        status: (strategy.enabled === true) ? 'active' as const : 'inactive' as const,
         last_updated: new Date().toISOString(),
-        performance_stats: {}
+        performance_stats: {},
+        config: {
+          min_dte: strategy.min_dte,
+          max_dte: strategy.max_dte,
+          risk_level: strategy.risk_level,
+          enabled: strategy.enabled
+        }
       }));
       
+      // Extract unique categories from strategies  
+      const uniqueCategories = [...new Set(enhancedStrategies.map(s => s.category))];
+      
       setStrategies(enhancedStrategies);
-      setCategories(['high_probability', 'swing_trades', 'volatility_plays']);
+      setCategories(uniqueCategories);
       
       // Now load all opportunities and distribute them to strategies
       await loadAllOpportunities();

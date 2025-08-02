@@ -402,7 +402,7 @@ class OpportunityCache:
                 opportunity = {
                     "id": opp_id,
                     "symbol": symbol,
-                    "strategy_type": strategy or "high_probability",
+                    "strategy_type": strategy or ("theta_decay" if i % 2 == 0 else "PROTECTIVE_PUT"),
                     "short_strike": 620 + (i * 5) + random.randint(-10, 10),
                     "long_strike": 610 + (i * 5) + random.randint(-10, 10), 
                     "premium": round(2.0 + random.random() * 3.0, 2),
@@ -411,7 +411,8 @@ class OpportunityCache:
                     "probability_profit": round(0.70 + random.random() * 0.15, 3),
                     "expected_value": 180 + (i * 20),
                     "days_to_expiration": 35 + random.randint(-5, 5),
-                    "underlying_price": 625 + (i * 2),
+                    "expiration": (datetime.now() + timedelta(days=35 + random.randint(-5, 5))).strftime("%Y-%m-%d"),
+                    "underlying_price": await self._get_real_price(symbol),
                     "liquidity_score": round(9.0 - (i * 0.1), 1),
                     "bias": random.choice(["BULLISH", "NEUTRAL", "BEARISH"]),
                     "rsi": 45 + (i * 2) + random.randint(-8, 8),
@@ -427,6 +428,20 @@ class OpportunityCache:
         except Exception as e:
             logger.error(f"Error during fallback scan: {e}")
             return None
+    
+    async def _get_real_price(self, symbol: str) -> float:
+        """Get real market price for symbol."""
+        try:
+            # Try to get real market data
+            from plugins.data.yfinance_provider import YFinanceProvider
+            provider = YFinanceProvider()
+            quote = await provider.get_quote(symbol)
+            return quote.price
+        except Exception as e:
+            logger.warning(f"Could not get real price for {symbol}: {e}")
+            # Fallback to reasonable estimates
+            fallback_prices = {"MSFT": 523.66, "AAPL": 225.0, "GOOGL": 179.0, "AMZN": 180.0, "META": 520.0}
+            return fallback_prices.get(symbol, 100.0)
     
     def _update_memory_cache(self, cache_key: str, opportunities: List[Dict[str, Any]]):
         """Update memory cache with new opportunities."""

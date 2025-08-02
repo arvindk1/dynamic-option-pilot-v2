@@ -7,7 +7,7 @@ Supports both Strategy Tab (testing) and Trading Tab (live execution).
 
 from typing import Dict, Any, List, Optional
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 import asyncio
 import random
 
@@ -294,13 +294,23 @@ class JSONStrategyPlugin(BaseStrategyPlugin):
                 max_loss = wing_width * 100 - premium * 100
                 
             elif strategy_type == 'PROTECTIVE_PUT':
-                # Protective put - downside protection
-                delta_target = position_params.get('delta_target', 0.25)
-                short_strike_put = quote.price * (1 - delta_target - variant * 0.02)
+                # Protective put - insurance for long stock position
+                # Long 100 shares + Long 1 Put for downside protection
+                protection_level = position_params.get('protection_level', 0.95)  # 95% protection level
+                long_strike_put = quote.price * protection_level
                 
-                premium = 2.2 + variant * 0.5
-                max_loss = (quote.price - short_strike_put) * 100 + premium * 100
+                # Premium PAID for put protection (insurance cost)
+                premium_paid = 2.5 + variant * 0.8  # Cost to buy protection
+                
+                # Max loss = stock decline to put strike + premium paid for protection
+                max_loss = (quote.price - long_strike_put) * 100 + premium_paid * 100
+                
+                # Protective put has NO short option - only long stock + long put
                 short_strike_call = None
+                short_strike_put = None  # No short option in protective put
+                
+                # Store the long put strike for display
+                premium = premium_paid  # Cost paid, not collected
                 
             elif strategy_type in ['COLLAR', 'CALENDAR_SPREAD']:
                 # Collar or calendar spread strategies
@@ -344,9 +354,11 @@ class JSONStrategyPlugin(BaseStrategyPlugin):
                 strategy_id=self.json_config.strategy_id,
                 underlying_price=quote.price,
                 
-                # Option details  
+                # Option details - handle Protective Put specially
                 short_strike=short_strike_put if short_strike_put else short_strike_call,
-                long_strike=(short_strike_put - 10) if short_strike_put else ((short_strike_call + 10) if short_strike_call else None),
+                long_strike=long_strike_put if strategy_type == 'PROTECTIVE_PUT' and 'long_strike_put' in locals() else (
+                    (short_strike_put - 10) if short_strike_put else ((short_strike_call + 10) if short_strike_call else None)
+                ),
                 
                 # Financial metrics
                 premium=premium,
@@ -360,8 +372,9 @@ class JSONStrategyPlugin(BaseStrategyPlugin):
                 theta=-0.5,
                 vega=0.15,
                 
-                # Metadata
-                days_to_expiration=position_params.get('target_dtes', [30])[0],
+                # Metadata - Use proper options expiration dates
+                days_to_expiration=self._calculate_proper_dte(position_params.get('target_dtes', [30])[0]),
+                expiration=self._calculate_expiration_date(position_params.get('target_dtes', [30])[0]),
                 volume=quote.volume,
                 open_interest=1000 + variant * 500,
                 liquidity_score=8.0 + variant * 0.3
@@ -634,3 +647,111 @@ class JSONStrategyPlugin(BaseStrategyPlugin):
                 'risk_factors': ['CALCULATION_ERROR'],
                 'error': str(e)
             }
+    
+    def _calculate_proper_dte(self, target_dte: int) -> int:
+        """Calculate DTE to the next proper options expiration date (3rd Friday)."""
+        today = date.today()
+        
+        # Find the next Friday
+        days_ahead = 4 - today.weekday()  # Friday is weekday 4
+        if days_ahead <= 0:  # If today is Friday or later, go to next week
+            days_ahead += 7
+        
+        next_friday = today + timedelta(days=days_ahead)
+        
+        # Find the nearest 3rd Friday expiration
+        current_month = next_friday.month
+        current_year = next_friday.year
+        
+        # Calculate 3rd Friday of current month
+        first_day = date(current_year, current_month, 1)
+        # Find first Friday of the month
+        first_friday = first_day + timedelta(days=(4 - first_day.weekday()) % 7)
+        # 3rd Friday is 2 weeks later
+        third_friday = first_friday + timedelta(days=14)
+        
+        # If we missed this month's 3rd Friday, go to next month
+        if third_friday <= today:
+            # Move to next month
+            if current_month == 12:
+                current_month = 1
+                current_year += 1
+            else:
+                current_month += 1
+            
+            first_day = date(current_year, current_month, 1)
+            first_friday = first_day + timedelta(days=(4 - first_day.weekday()) % 7)
+            third_friday = first_friday + timedelta(days=14)
+        
+        # Calculate DTE to this proper expiration
+        proper_dte = (third_friday - today).days
+        
+        # If target DTE is much different, find closer expiration
+        if abs(proper_dte - target_dte) > 10:
+            # Try next month's expiration
+            next_month = current_month + 1 if current_month < 12 else 1
+            next_year = current_year + 1 if current_month == 12 else current_year
+            
+            first_day = date(next_year, next_month, 1)
+            first_friday = first_day + timedelta(days=(4 - first_day.weekday()) % 7)
+            next_third_friday = first_friday + timedelta(days=14)
+            next_dte = (next_third_friday - today).days
+            
+            # Choose the closer one
+            if abs(next_dte - target_dte) < abs(proper_dte - target_dte):
+                return next_dte
+        
+        return proper_dte
+    
+    def _calculate_expiration_date(self, target_dte: int) -> str:
+        """Calculate the actual expiration date string (3rd Friday)."""
+        today = date.today()
+        
+        # Find the next Friday
+        days_ahead = 4 - today.weekday()  # Friday is weekday 4
+        if days_ahead <= 0:  # If today is Friday or later, go to next week
+            days_ahead += 7
+        
+        next_friday = today + timedelta(days=days_ahead)
+        
+        # Find the nearest 3rd Friday expiration
+        current_month = next_friday.month
+        current_year = next_friday.year
+        
+        # Calculate 3rd Friday of current month
+        first_day = date(current_year, current_month, 1)
+        # Find first Friday of the month
+        first_friday = first_day + timedelta(days=(4 - first_day.weekday()) % 7)
+        # 3rd Friday is 2 weeks later
+        third_friday = first_friday + timedelta(days=14)
+        
+        # If we missed this month's 3rd Friday, go to next month
+        if third_friday <= today:
+            # Move to next month
+            if current_month == 12:
+                current_month = 1
+                current_year += 1
+            else:
+                current_month += 1
+            
+            first_day = date(current_year, current_month, 1)
+            first_friday = first_day + timedelta(days=(4 - first_day.weekday()) % 7)
+            third_friday = first_friday + timedelta(days=14)
+        
+        # If target DTE is much different, find closer expiration
+        proper_dte = (third_friday - today).days
+        if abs(proper_dte - target_dte) > 10:
+            # Try next month's expiration
+            next_month = current_month + 1 if current_month < 12 else 1
+            next_year = current_year + 1 if current_month == 12 else current_year
+            
+            first_day = date(next_year, next_month, 1)
+            first_friday = first_day + timedelta(days=(4 - first_day.weekday()) % 7)
+            next_third_friday = first_friday + timedelta(days=14)
+            next_dte = (next_third_friday - today).days
+            
+            # Choose the closer one
+            if abs(next_dte - target_dte) < abs(proper_dte - target_dte):
+                third_friday = next_third_friday
+        
+        return third_friday.isoformat()  # Returns "2025-08-15" format
