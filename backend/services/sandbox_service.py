@@ -478,7 +478,20 @@ class SandboxService:
                 SandboxStrategyConfig.user_id == user_id
             ).order_by(desc(SandboxStrategyConfig.updated_at)).all()
             
-            return configs
+            # Remove duplicates by strategy_id and name, keeping the most recent
+            seen_strategies = {}
+            unique_configs = []
+            
+            for config in configs:
+                key = f"{config.strategy_id}_{config.name}"
+                if key not in seen_strategies:
+                    seen_strategies[key] = config
+                    unique_configs.append(config)
+                else:
+                    # This is a duplicate, skip it but don't delete to avoid DB constraints
+                    logger.warning(f"Skipping duplicate sandbox strategy: {config.id} ({config.name})")
+            
+            return unique_configs
             
         finally:
             db.close()

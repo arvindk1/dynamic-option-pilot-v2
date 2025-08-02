@@ -311,15 +311,30 @@ const StrategyEditor: React.FC<{
     }
   };
 
+  const { theme } = useTheme();
+  
+  const themeClasses = {
+    configPanel: theme === 'dark' 
+      ? 'bg-gray-900 border-gray-700' 
+      : 'bg-white border-gray-200',
+    aiPanel: theme === 'dark'
+      ? 'bg-gray-800 border-gray-700'
+      : 'bg-gray-50 border-gray-200',
+    text: {
+      primary: theme === 'dark' ? 'text-white' : 'text-gray-900',
+      secondary: theme === 'dark' ? 'text-gray-300' : 'text-gray-600'
+    }
+  };
+
   return (
     <div className="flex-1 flex">
       {/* Strategy Configuration Panel (Left) */}
-      <div className="flex-1 bg-white border-r border-gray-200">
+      <div className={`flex-1 ${themeClasses.configPanel} border-r`}>
         <div className="p-6">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h2 className="text-xl font-semibold text-gray-900">{strategy.name}</h2>
-              <p className="text-gray-600">{strategy.strategy_id}</p>
+              <h2 className={`text-xl font-semibold ${themeClasses.text.primary}`}>{strategy.name}</h2>
+              <p className={themeClasses.text.secondary}>{strategy.strategy_id}</p>
             </div>
             <div className="flex gap-2">
               <button
@@ -356,7 +371,7 @@ const StrategyEditor: React.FC<{
       </div>
 
       {/* AI Assistant Panel (Right) */}
-      <div className="w-80 bg-gray-50 border-l border-gray-200">
+      <div className={`w-80 ${themeClasses.aiPanel} border-l`}>
         <AIAssistantPanel strategy={strategy} />
       </div>
     </div>
@@ -368,6 +383,7 @@ const StrategyParametersPanel: React.FC<{
   strategy: StrategyConfig,
   onParameterChange?: (parameter: string, value: any) => void 
 }> = ({ strategy, onParameterChange }) => {
+  const { theme } = useTheme();
   const [isEditing, setIsEditing] = useState(false);
   const [editedConfig, setEditedConfig] = useState(strategy.config_data);
   const [universes, setUniverses] = useState<any[]>([]);
@@ -450,10 +466,22 @@ const StrategyParametersPanel: React.FC<{
 
   const config = isEditing ? editedConfig : strategy.config_data;
 
+  const themeClasses = {
+    title: theme === 'dark' ? 'text-white' : 'text-gray-900',
+    parametersBg: theme === 'dark' ? 'bg-gray-800' : 'bg-gray-50',
+    sectionTitle: theme === 'dark' ? 'text-gray-300' : 'text-gray-700',
+    input: theme === 'dark' 
+      ? 'border-gray-600 bg-gray-700 text-white focus:ring-blue-400 focus:border-blue-400' 
+      : 'border-gray-300 bg-white text-gray-900 focus:ring-blue-500 focus:border-blue-500',
+    select: theme === 'dark'
+      ? 'border-gray-600 bg-gray-700 text-white focus:ring-blue-400'
+      : 'border-gray-300 bg-white text-gray-900 focus:ring-blue-500'
+  };
+
   return (
     <div className="mb-6">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="font-medium text-gray-900">Strategy Parameters</h3>
+        <h3 className={`font-medium ${themeClasses.title}`}>Strategy Parameters</h3>
         <button
           onClick={() => setIsEditing(!isEditing)}
           className={`px-3 py-1 text-xs rounded-lg transition-colors ${
@@ -466,16 +494,16 @@ const StrategyParametersPanel: React.FC<{
         </button>
       </div>
       
-      <div className="space-y-4 bg-gray-50 p-4 rounded-lg">
+      <div className={`space-y-4 ${themeClasses.parametersBg} p-4 rounded-lg`}>
         {/* Universe Selection */}
         <div>
-          <h4 className="font-medium text-sm text-gray-700 mb-2">Trading Universe</h4>
+          <h4 className={`font-medium text-sm ${themeClasses.sectionTitle} mb-2`}>Trading Universe</h4>
           {isEditing ? (
             <div className="space-y-2">
               <select
                 value={selectedUniverse}
                 onChange={(e) => handleUniverseChange(e.target.value)}
-                className="block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={`block w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 ${themeClasses.select}`}
               >
                 <option value="">Select Universe...</option>
                 {universes.map((universe) => (
@@ -484,7 +512,7 @@ const StrategyParametersPanel: React.FC<{
                   </option>
                 ))}
               </select>
-              <div className="text-xs text-gray-500">
+              <div className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
                 {selectedUniverse && universes.find(u => u.id === selectedUniverse)?.description}
               </div>
             </div>
@@ -502,7 +530,7 @@ const StrategyParametersPanel: React.FC<{
         {/* Trading Parameters */}
         {config.trading && (
           <div>
-            <h4 className="font-medium text-sm text-gray-700 mb-2">Trading Rules</h4>
+            <h4 className={`font-medium text-sm ${themeClasses.sectionTitle} mb-2`}>Trading Rules</h4>
             <div className="grid grid-cols-2 gap-4 text-sm">
               <ParameterField
                 label="DTE Range"
@@ -535,7 +563,7 @@ const StrategyParametersPanel: React.FC<{
         {/* Risk Parameters */}
         {config.risk && (
           <div>
-            <h4 className="font-medium text-sm text-gray-700 mb-2">Risk Management</h4>
+            <h4 className={`font-medium text-sm ${themeClasses.sectionTitle} mb-2`}>Risk Management</h4>
             <div className="grid grid-cols-2 gap-4 text-sm">
               <ParameterField
                 label="Profit Target"
@@ -564,21 +592,30 @@ const ParameterField: React.FC<{
   isEditing: boolean;
   onEdit?: (value: string) => void;
 }> = ({ label, value, isEditing, onEdit }) => {
+  const { theme } = useTheme();
   const [editValue, setEditValue] = useState(String(value));
+
+  const themeClasses = {
+    label: theme === 'dark' ? 'text-gray-300' : 'text-gray-600',
+    value: theme === 'dark' ? 'text-white' : 'text-gray-900',
+    input: theme === 'dark' 
+      ? 'border-gray-600 bg-gray-700 text-white focus:ring-blue-400' 
+      : 'border-gray-300 bg-white text-gray-900 focus:ring-blue-500'
+  };
 
   return (
     <div>
-      <span className="text-gray-600">{label}:</span>
+      <span className={themeClasses.label}>{label}:</span>
       {isEditing && onEdit ? (
         <input
           type="text"
           value={editValue}
           onChange={(e) => setEditValue(e.target.value)}
           onBlur={() => onEdit(editValue)}
-          className="ml-2 px-2 py-1 border border-gray-300 rounded text-xs w-20 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className={`ml-2 px-2 py-1 border rounded text-xs w-20 focus:outline-none focus:ring-1 ${themeClasses.input}`}
         />
       ) : (
-        <span className="ml-2 font-medium">{value}</span>
+        <span className={`ml-2 font-medium ${themeClasses.value}`}>{value}</span>
       )}
     </div>
   );
@@ -676,6 +713,7 @@ const TestResultsPanel: React.FC<{ result: TestResult }> = ({ result }) => {
 
 // AI Assistant panel
 const AIAssistantPanel: React.FC<{ strategy: StrategyConfig }> = ({ strategy }) => {
+  const { theme } = useTheme();
   const [messages, setMessages] = useState<Array<{role: string, content: string, timestamp: string}>>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -727,20 +765,31 @@ const AIAssistantPanel: React.FC<{ strategy: StrategyConfig }> = ({ strategy }) 
     }
   };
 
+  const themeClasses = {
+    border: theme === 'dark' ? 'border-gray-700' : 'border-gray-200',
+    title: theme === 'dark' ? 'text-white' : 'text-gray-900',
+    subtitle: theme === 'dark' ? 'text-gray-300' : 'text-gray-600',
+    emptyText: theme === 'dark' ? 'text-gray-400' : 'text-gray-500',
+    messageAssistant: theme === 'dark' ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-200',
+    input: theme === 'dark' 
+      ? 'border-gray-600 bg-gray-700 text-white focus:ring-blue-400 focus:border-blue-400' 
+      : 'border-gray-300 bg-white text-gray-900 focus:ring-blue-500 focus:border-blue-500'
+  };
+
   return (
     <div className="h-full flex flex-col">
-      <div className="p-4 border-b border-gray-200">
-        <h3 className="font-medium text-gray-900">AI Strategy Assistant</h3>
-        <p className="text-sm text-gray-600 mt-1">Ask questions about your strategy</p>
+      <div className={`p-4 border-b ${themeClasses.border}`}>
+        <h3 className={`font-medium ${themeClasses.title}`}>AI Strategy Assistant</h3>
+        <p className={`text-sm ${themeClasses.subtitle} mt-1`}>Ask questions about your strategy</p>
       </div>
 
       {/* Chat Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.length === 0 ? (
-          <div className="text-center text-gray-500 mt-8">
-            <TrendingUp className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+          <div className={`text-center ${themeClasses.emptyText} mt-8`}>
+            <TrendingUp className={`w-8 h-8 mx-auto mb-2 ${themeClasses.emptyText}`} />
             <p className="text-sm">Ask me about your strategy!</p>
-            <p className="text-xs text-gray-400 mt-1">
+            <p className={`text-xs ${themeClasses.emptyText} mt-1`}>
               Try "How does this strategy look?" or "What can I improve?"
             </p>
           </div>
@@ -752,7 +801,7 @@ const AIAssistantPanel: React.FC<{ strategy: StrategyConfig }> = ({ strategy }) 
               <div className={`p-3 rounded-lg ${
                 message.role === 'user' 
                   ? 'bg-blue-600 text-white ml-auto max-w-xs' 
-                  : 'bg-white border border-gray-200 max-w-sm'
+                  : `${themeClasses.messageAssistant} border max-w-sm`
               }`}>
                 <p className="text-sm">{message.content}</p>
               </div>
@@ -764,10 +813,10 @@ const AIAssistantPanel: React.FC<{ strategy: StrategyConfig }> = ({ strategy }) 
         )}
         {isLoading && (
           <div className="mr-4">
-            <div className="bg-white border border-gray-200 p-3 rounded-lg max-w-sm">
+            <div className={`${themeClasses.messageAssistant} border p-3 rounded-lg max-w-sm`}>
               <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4 animate-spin text-gray-400" />
-                <span className="text-sm text-gray-500">Thinking...</span>
+                <Clock className={`w-4 h-4 animate-spin ${themeClasses.emptyText}`} />
+                <span className={`text-sm ${themeClasses.emptyText}`}>Thinking...</span>
               </div>
             </div>
           </div>
@@ -775,7 +824,7 @@ const AIAssistantPanel: React.FC<{ strategy: StrategyConfig }> = ({ strategy }) 
       </div>
 
       {/* Message Input */}
-      <div className="p-4 border-t border-gray-200">
+      <div className={`p-4 border-t ${themeClasses.border}`}>
         <div className="flex gap-2">
           <input
             type="text"
@@ -783,7 +832,7 @@ const AIAssistantPanel: React.FC<{ strategy: StrategyConfig }> = ({ strategy }) 
             onChange={(e) => setInputMessage(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
             placeholder="Type your question..."
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+            className={`flex-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:border-transparent text-sm ${themeClasses.input}`}
             disabled={isLoading}
           />
           <button
@@ -801,12 +850,21 @@ const AIAssistantPanel: React.FC<{ strategy: StrategyConfig }> = ({ strategy }) 
 
 // Empty state when no strategy is selected
 const EmptyStrategyView: React.FC<{ onCreateNew: () => void }> = ({ onCreateNew }) => {
+  const { theme } = useTheme();
+  
+  const themeClasses = {
+    container: theme === 'dark' ? 'bg-gray-900' : 'bg-white',
+    title: theme === 'dark' ? 'text-white' : 'text-gray-900',
+    text: theme === 'dark' ? 'text-gray-300' : 'text-gray-600',
+    icon: theme === 'dark' ? 'text-gray-500' : 'text-gray-400'
+  };
+
   return (
-    <div className="flex-1 flex items-center justify-center bg-white">
+    <div className={`flex-1 flex items-center justify-center ${themeClasses.container}`}>
       <div className="text-center max-w-md">
-        <Settings className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-        <h2 className="text-xl font-semibold text-gray-900 mb-2">Strategy Sandbox</h2>
-        <p className="text-gray-600 mb-6">
+        <Settings className={`w-16 h-16 mx-auto mb-4 ${themeClasses.icon}`} />
+        <h2 className={`text-xl font-semibold ${themeClasses.title} mb-2`}>Strategy Sandbox</h2>
+        <p className={`${themeClasses.text} mb-6`}>
           Create and test your trading strategies in a safe environment. 
           Run tests with historical data, get AI feedback, and deploy when ready.
         </p>
