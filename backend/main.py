@@ -41,7 +41,7 @@ from core.orchestrator.strategy_registry import initialize_strategy_registry, ge
 from plugins.trading.thetacrop_weekly_plugin import ThetaCropWeeklyPlugin
 from plugins.trading.base_strategy import StrategyConfig
 from utils.config_loader import initialize_config_loader, get_config_loader
-from utils.universe_loader import get_universe_loader
+from services.universe_loader import get_universe_loader
 
 # Configure logging
 logging.basicConfig(
@@ -547,38 +547,10 @@ async def get_demo_account_metrics():
 
 # Trading Opportunities Endpoint  
 @app.get("/api/trading/opportunities")
-async def get_trading_opportunities(strategy: str = None, symbols: str = None, force_refresh: bool = False):
-    """Get current trading opportunities using cache-first approach."""
-    try:
-        # Get opportunity cache
-        cache = get_opportunity_cache()
-        if not cache:
-            raise HTTPException(status_code=503, detail="Opportunity cache not available")
-        
-        # Parse symbols parameter
-        symbol_list = None
-        if symbols:
-            symbol_list = [s.strip().upper() for s in symbols.split(",")]
-        
-        # Get opportunities from cache
-        opportunities = await cache.get_opportunities(
-            strategy=strategy,
-            symbols=symbol_list,
-            force_refresh=force_refresh
-        )
-        
-        return {
-            "opportunities": opportunities,
-            "total_count": len(opportunities),
-            "strategy_filter": strategy,
-            "symbol_filter": symbol_list,
-            "cache_stats": cache.get_cache_stats(),
-            "last_updated": datetime.utcnow().isoformat()
-        }
-        
-    except Exception as e:
-        logger.error(f"Error fetching trading opportunities: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+async def get_trading_opportunities(strategy: str = None, symbols: str = None, force_refresh: bool = False, universe: str = None):
+    """Get current trading opportunities - FIXED VERSION using direct strategy aggregation."""
+    # TEMPORARY FIX: Use the working direct method instead of broken cache
+    return await get_trading_opportunities_direct(strategy=strategy, symbols=symbols, max_per_strategy=5, universe=universe)
 
 
 # Scheduler Status and Management Endpoints
@@ -2121,6 +2093,191 @@ async def get_available_json_strategies():
         
     except Exception as e:
         logger.error(f"Error getting available JSON strategies: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/trading/universes")
+async def get_available_universes():
+    """Get all available trading universes with their symbols."""
+    try:
+        universe_loader = get_universe_loader()
+        universes = universe_loader.get_all_universes()
+        
+        universe_list = []
+        for name, info in universes.items():
+            universe_list.append({
+                "name": name,
+                "description": info.description,
+                "symbol_count": len(info.symbols),
+                "symbols": info.symbols[:10],  # First 10 symbols for preview
+                "file_path": info.file_path
+            })
+        
+        return {
+            "universes": universe_list,
+            "total_count": len(universe_list),
+            "available_universe_names": list(universes.keys())
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting universes: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/trading/opportunities-direct")
+async def get_trading_opportunities_direct(strategy: str = None, symbols: str = None, max_per_strategy: int = 3, universe: str = None):
+    """
+    WORKAROUND: Get opportunities by directly calling individual strategy scans.
+    This bypasses the broken cache service and aggregates results from working individual scans.
+    """
+    try:
+        registry = get_strategy_registry()
+        if not registry:
+            raise HTTPException(status_code=503, detail="Strategy registry not available")
+        
+        # Parse symbols parameter
+        symbol_list = None
+        if symbols:
+            symbol_list = [s.strip().upper() for s in symbols.split(",")]
+        
+        all_opportunities = []
+        
+        # Get list of strategies to scan
+        if strategy:
+            strategies_to_scan = [strategy]
+        else:
+            # Get all enabled strategies
+            strategy_list = await get_strategies()
+            strategies_to_scan = [s["id"] for s in strategy_list["strategies"] if s["enabled"]]
+        
+        # Scan each strategy individually using the working scan logic
+        for strategy_id in strategies_to_scan:
+            try:
+                strategy_plugin = registry.get_strategy(strategy_id)
+                if not strategy_plugin:
+                    continue
+                
+                json_config = strategy_plugin.json_config
+                universe_config = json_config.universe or {}
+                
+                # Use symbols from parameters if provided
+                if symbol_list:
+                    scan_symbols = symbol_list[:5]  # User-specified symbols
+                elif universe:
+                    # Use specified universe for all strategies
+                    try:
+                        universe_loader = get_universe_loader()
+                        scan_symbols = universe_loader.get_universe(universe)
+                        if scan_symbols:
+                            scan_symbols = scan_symbols[:8]  # Limit for performance
+                            logger.info(f"Using {universe} universe with {len(scan_symbols)} symbols for {strategy_id}")
+                        else:
+                            logger.warning(f"Universe {universe} not found, using defaults")
+                            scan_symbols = []
+                    except Exception as e:
+                        logger.warning(f"Failed to load universe {universe}: {e}")
+                        scan_symbols = []
+                else:
+                    # Load universe symbols using proper universe loading logic
+                    scan_symbols = []
+                    
+                    # Try to load from universe_file first
+                    if "universe_file" in universe_config:
+                        try:
+                            universe_loader = get_universe_loader()
+                            file_path = universe_config["universe_file"]
+                            # Extract filename from path if it's a full path
+                            if "/" in file_path:
+                                universe_name = file_path.split("/")[-1].replace(".txt", "")
+                            else:
+                                universe_name = file_path.replace(".txt", "")
+                            
+                            scan_symbols = universe_loader.get_universe(universe_name)
+                            if scan_symbols:
+                                max_symbols = universe_config.get("max_symbols", 8)  # Increased from 3
+                                scan_symbols = scan_symbols[:max_symbols]
+                                logger.info(f"Loaded {len(scan_symbols)} symbols from {universe_name}: {scan_symbols}")
+                        except Exception as e:
+                            logger.warning(f"Failed to load universe file for {strategy_id}: {e}")
+                    
+                    # Fallback to primary_symbols
+                    if not scan_symbols and "primary_symbols" in universe_config:
+                        scan_symbols = universe_config["primary_symbols"][:5]
+                    
+                    # Final fallback to strategy-appropriate defaults
+                    if not scan_symbols:
+                        if "THETA" in strategy_id.upper():
+                            scan_symbols = ["SPY", "QQQ", "IWM"]  # ETFs for theta strategies
+                        elif "RSI" in strategy_id.upper():
+                            scan_symbols = ["AAPL", "MSFT", "GOOGL"]  # High-volume stocks for RSI
+                        else:
+                            scan_symbols = ["SPY"]  # Conservative default
+                
+                # Get opportunities using the working scan method
+                opportunities = await strategy_plugin.scan_opportunities(scan_symbols)
+                
+                # Convert StrategyOpportunity objects to dict format
+                for opp in opportunities[:max_per_strategy]:
+                    # Helper function to clean float values
+                    def clean_float(value, default=0.0):
+                        if value is None:
+                            return default
+                        if isinstance(value, (int, float)):
+                            if value == float('inf') or value == float('-inf') or value != value:  # NaN check
+                                return default
+                            return float(value)
+                        return default
+                    
+                    opp_dict = {
+                        "id": opp.id,
+                        "symbol": opp.symbol,
+                        "strategy_type": opp.strategy_type,
+                        "short_strike": clean_float(getattr(opp, 'short_strike', 0)),
+                        "long_strike": clean_float(getattr(opp, 'long_strike', 0)),
+                        "premium": clean_float(opp.premium),
+                        "max_loss": clean_float(getattr(opp, 'max_loss', 0)),
+                        "delta": clean_float(getattr(opp, 'delta', 0)),
+                        "probability_profit": clean_float(opp.probability_profit),
+                        "expected_value": clean_float(opp.expected_value),
+                        "days_to_expiration": int(opp.days_to_expiration or 0),
+                        "underlying_price": clean_float(opp.underlying_price),
+                        "liquidity_score": clean_float(getattr(opp, 'liquidity_score', 5.0), 5.0),
+                        "bias": getattr(opp, 'market_bias', 'NEUTRAL'),
+                        "rsi": clean_float(getattr(opp, 'rsi', 50.0), 50.0),
+                        "created_at": getattr(opp, 'created_at', datetime.utcnow()).isoformat(),
+                        "is_demo": False,
+                        "scan_source": "direct_strategy_scan",
+                        "universe": getattr(opp, 'universe', 'default')
+                    }
+                    all_opportunities.append(opp_dict)
+                    
+            except Exception as e:
+                logger.warning(f"Strategy {strategy_id} scan failed: {e}")
+                continue
+        
+        return {
+            "opportunities": all_opportunities,
+            "total_count": len(all_opportunities),
+            "strategy_filter": strategy,
+            "symbol_filter": symbol_list,
+            "cache_stats": {
+                "stats": {
+                    "memory_hits": 0,
+                    "database_hits": 0,
+                    "live_scans": len(strategies_to_scan),
+                    "demo_fallbacks": 0,
+                    "total_requests": 1
+                },
+                "memory_cache": {"entries": 0, "strategies": []},
+                "hit_rate": 0.0,
+                "last_cleanup": datetime.utcnow().isoformat()
+            },
+            "last_updated": datetime.utcnow().isoformat(),
+            "source": "direct_strategy_aggregation"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting opportunities direct: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

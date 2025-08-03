@@ -11,9 +11,11 @@ from dataclasses import dataclass
 from datetime import datetime
 
 try:
-    import openai
+    from openai import AsyncOpenAI
+    openai_available = True
 except ImportError:
-    openai = None
+    AsyncOpenAI = None
+    openai_available = False
 
 logger = logging.getLogger(__name__)
 
@@ -62,10 +64,14 @@ class StrategyAIService:
         if not self.api_key:
             logger.warning("OpenAI API key not found. AI features will be disabled.")
             self.enabled = False
+            self.client = None
         else:
             self.enabled = True
-            if openai:
-                openai.api_key = self.api_key
+            if openai_available and AsyncOpenAI:
+                self.client = AsyncOpenAI(api_key=self.api_key)
+            else:
+                self.client = None
+                self.enabled = False
         
         self.current_model = DEFAULT_MODEL
         self.conversation_history: Dict[str, List[Dict]] = {}
@@ -177,22 +183,31 @@ You are an expert options strategy analyst focused solely on optimizing this {st
         Returns:
             Dict with AI response, token usage, and cost
         """
+        logger.info(f"AI Chat Request - Strategy: {strategy_name}, Message: {user_message[:50]}...")
+        logger.info(f"AI Service State - Enabled: {self.enabled}, Client: {self.client is not None}")
+        
         if not self.enabled:
+            logger.warning("AI service not enabled - API key not configured")
             return {
                 "response": "AI assistant is not available. Please configure OpenAI API key.",
                 "error": "API key not configured",
-                "model": None,
+                "model": "unknown",
                 "tokens_used": 0,
-                "estimated_cost": 0
+                "estimated_cost": 0,
+                "conversation_id": conversation_id or "unknown",
+                "timestamp": datetime.now().isoformat()
             }
         
-        if not openai:
+        if not self.client:
+            logger.warning("OpenAI client not available")
             return {
-                "response": "OpenAI library not installed. Please install: pip install openai",
-                "error": "Library missing",
-                "model": None,
+                "response": "OpenAI client not available. Please check API key and library installation.",
+                "error": "Client not available",
+                "model": "unknown",
                 "tokens_used": 0,
-                "estimated_cost": 0
+                "estimated_cost": 0,
+                "conversation_id": conversation_id or "unknown",
+                "timestamp": datetime.now().isoformat()
             }
         
         try:
@@ -216,8 +231,8 @@ You are an expert options strategy analyst focused solely on optimizing this {st
                 {"role": "system", "content": system_prompt}
             ] + self.conversation_history[conversation_id]
             
-            # Make OpenAI API call - this is the same regardless of model!
-            response = await openai.ChatCompletion.acreate(
+            # Make OpenAI API call using new client syntax
+            response = await self.client.chat.completions.create(
                 model=self.current_model,  # Only this changes between models
                 messages=messages,
                 max_tokens=500,  # Keep responses concise
@@ -226,8 +241,15 @@ You are an expert options strategy analyst focused solely on optimizing this {st
                 presence_penalty=0.1
             )
             
-            # Extract response
-            ai_response = response.choices[0].message.content.strip()
+            # Extract response with better error handling
+            if not response.choices or not response.choices[0].message:
+                raise Exception("No response choices returned from OpenAI")
+            
+            ai_response = response.choices[0].message.content
+            if not ai_response:
+                raise Exception("Empty response content from OpenAI")
+            
+            ai_response = ai_response.strip()
             
             # Add AI response to conversation history
             self.conversation_history[conversation_id].append({
@@ -257,13 +279,33 @@ You are an expert options strategy analyst focused solely on optimizing this {st
             }
             
         except Exception as e:
+            # Log critical AI service error
+            try:
+                from services.error_logging_service import log_critical_error
+                await log_critical_error(
+                    error_type="ai_service_error",
+                    message=f"AI Assistant failed to respond: {str(e)}",
+                    details={
+                        "strategy_name": strategy_name,
+                        "user_message": user_message[:100],  # First 100 chars
+                        "model": self.current_model,
+                        "error": str(e)
+                    },
+                    service="strategy_ai_service",
+                    severity="HIGH"
+                )
+            except:
+                pass  # Don't let error logging fail the response
+            
             logger.error(f"Error in strategy AI chat: {e}")
             return {
-                "response": f"Sorry, I encountered an error: {str(e)}",
+                "response": f"Sorry, I encountered an error. This has been logged for investigation: {str(e)[:50]}...",
                 "error": str(e),
                 "model": self.current_model,
                 "tokens_used": 0,
-                "estimated_cost": 0
+                "estimated_cost": 0,
+                "conversation_id": conversation_id,
+                "timestamp": datetime.now().isoformat()
             }
     
     def clear_conversation(self, conversation_id: str):

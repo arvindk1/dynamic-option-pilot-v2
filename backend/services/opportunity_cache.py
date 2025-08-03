@@ -24,6 +24,7 @@ from models.opportunity import OpportunitySnapshot, ScanSession
 from core.orchestrator.plugin_registry import PluginRegistry
 from core.orchestrator.strategy_registry import get_strategy_registry
 from services.universe_loader import get_universe_loader
+from services.error_logging_service import log_critical_error
 
 logger = logging.getLogger(__name__)
 
@@ -281,7 +282,15 @@ class OpportunityCache:
             strategy_registry = get_strategy_registry()
             if not strategy_registry:
                 logger.warning("No strategy registry available for live scanning")
-                return await self._fallback_scan(strategy, symbols)
+                # No fallback - log error and fail explicitly
+                await log_critical_error(
+                    error_type="strategy_registry_unavailable",
+                    message=f"Strategy registry not available for {strategy}",
+                    details={"strategy": strategy, "symbols": symbols},
+                    service="opportunity_cache",
+                    severity="HIGH"
+                )
+                raise RuntimeError(f"Strategy registry not available - system health compromised")
             
             # Get universe loader for symbols
             universe_loader = get_universe_loader()
@@ -318,7 +327,7 @@ class OpportunityCache:
                             "days_to_expiration": opp.days_to_expiration,
                             "underlying_price": opp.underlying_price,
                             "liquidity_score": opp.liquidity_score,
-                            "bias": opp.market_bias,
+                            "bias": getattr(opp, 'market_bias', 'NEUTRAL'),
                             "rsi": getattr(opp, 'rsi', 50.0),
                             "created_at": opp.created_at.isoformat(),
                             "is_demo": False,
@@ -335,7 +344,15 @@ class OpportunityCache:
                         return None
                 else:
                     logger.warning(f"Strategy {strategy} not found in registry, using fallback")
-                    return await self._fallback_scan(strategy, symbols)
+                    # No fallback - log error and fail explicitly
+                await log_critical_error(
+                    error_type="strategy_registry_unavailable",
+                    message=f"Strategy registry not available for {strategy}",
+                    details={"strategy": strategy, "symbols": symbols},
+                    service="opportunity_cache",
+                    severity="HIGH"
+                )
+                raise RuntimeError(f"Strategy registry not available - system health compromised")
             
             # For generic scans or when strategy not found, scan all strategies
             logger.info("Scanning all registered strategies")
@@ -381,53 +398,21 @@ class OpportunityCache:
             return await self._fallback_scan(strategy, symbols)
     
     async def _fallback_scan(self, strategy: str = None, symbols: List[str] = None) -> Optional[List[Dict[str, Any]]]:
-        """Fallback scanning when strategy registry is not available."""
-        try:
-            logger.info("Using fallback scanning method")
-            opportunities = []
-            
-            # Get appropriate symbols 
-            universe_loader = get_universe_loader()
-            if symbols:
-                scan_symbols = symbols
-            else:
-                scan_symbols = universe_loader.get_strategy_universe_priority(strategy or 'high_probability')
-                scan_symbols = scan_symbols[:5]  # Fewer opportunities for fallback
-            
-            # Simple opportunity generation
-            import random
-            for i, symbol in enumerate(scan_symbols):
-                opp_id = f"fallback_{strategy}_{symbol}_{int(datetime.utcnow().timestamp())}"
-                
-                opportunity = {
-                    "id": opp_id,
-                    "symbol": symbol,
-                    "strategy_type": strategy or ("theta_decay" if i % 2 == 0 else "PROTECTIVE_PUT"),
-                    "short_strike": 620 + (i * 5) + random.randint(-10, 10),
-                    "long_strike": 610 + (i * 5) + random.randint(-10, 10), 
-                    "premium": round(2.0 + random.random() * 3.0, 2),
-                    "max_loss": 750 + (i * 50),
-                    "delta": round(-0.15 + (i * 0.02), 3),
-                    "probability_profit": round(0.70 + random.random() * 0.15, 3),
-                    "expected_value": 180 + (i * 20),
-                    "days_to_expiration": 35 + random.randint(-5, 5),
-                    "expiration": (datetime.now() + timedelta(days=35 + random.randint(-5, 5))).strftime("%Y-%m-%d"),
-                    "underlying_price": await self._get_real_price(symbol),
-                    "liquidity_score": round(9.0 - (i * 0.1), 1),
-                    "bias": random.choice(["BULLISH", "NEUTRAL", "BEARISH"]),
-                    "rsi": 45 + (i * 2) + random.randint(-8, 8),
-                    "created_at": datetime.utcnow().isoformat(),
-                    "is_demo": False,
-                    "scan_source": "fallback_scan",
-                    "universe": "default"
-                }
-                opportunities.append(opportunity)
-            
-            return opportunities if opportunities else None
-            
-        except Exception as e:
-            logger.error(f"Error during fallback scan: {e}")
-            return None
+        """DEPRECATED: No fallback scanning - explicit errors only."""
+        # Log critical error instead of providing fallback data
+        await log_critical_error(
+            error_type="strategy_scan_failure",
+            message=f"Strategy scanning failed for {strategy} - no fallback provided",
+            details={
+                "strategy": strategy,
+                "symbols": symbols,
+                "reason": "Strategy registry unavailable"
+            },
+            service="opportunity_cache",
+            severity="HIGH"
+        )
+        logger.error(f"Strategy {strategy} scanning failed - no fallback data provided")
+        raise RuntimeError(f"Strategy {strategy} is not available. System health compromised - check strategy registry.")
     
     async def _get_real_price(self, symbol: str) -> float:
         """Get real market price for symbol."""
@@ -438,10 +423,16 @@ class OpportunityCache:
             quote = await provider.get_quote(symbol)
             return quote.price
         except Exception as e:
-            logger.warning(f"Could not get real price for {symbol}: {e}")
-            # Fallback to reasonable estimates
-            fallback_prices = {"MSFT": 523.66, "AAPL": 225.0, "GOOGL": 179.0, "AMZN": 180.0, "META": 520.0}
-            return fallback_prices.get(symbol, 100.0)
+            # Log critical error - no fallback prices
+            await log_critical_error(
+                error_type="market_data_unavailable",
+                message=f"Real-time price data unavailable for {symbol}",
+                details={"symbol": symbol, "error": str(e)},
+                service="opportunity_cache",
+                severity="HIGH"
+            )
+            logger.error(f"Market data unavailable for {symbol} - no fallback price provided: {e}")
+            raise RuntimeError(f"Market data provider failed for {symbol}. System health compromised.")
     
     def _update_memory_cache(self, cache_key: str, opportunities: List[Dict[str, Any]]):
         """Update memory cache with new opportunities."""

@@ -403,14 +403,19 @@ const StrategyParametersPanel: React.FC<{
           
           // Set current universe if it matches
           const currentSymbols = strategy.config_data.universe?.primary_symbols || [];
+          console.log('Current symbols:', currentSymbols);
+          console.log('Available universes:', Object.keys(data.universes));
+          
           if (currentSymbols.length > 0) {
             // Try to match current symbols to a universe
             const matchingUniverse = Object.keys(data.universes).find(key => {
               // Simple heuristic - if first symbol matches common universe patterns
               if (key === 'mag7' && currentSymbols.includes('AAPL')) return true;
               if (key === 'etfs' && currentSymbols.includes('SPY')) return true;
+              if (key === 'thetacrop' && currentSymbols.includes('QQQ')) return true;
               return false;
             });
+            console.log('Matching universe:', matchingUniverse);
             if (matchingUniverse) setSelectedUniverse(matchingUniverse);
           }
         }
@@ -474,8 +479,8 @@ const StrategyParametersPanel: React.FC<{
       ? 'border-gray-600 bg-gray-700 text-white focus:ring-blue-400 focus:border-blue-400' 
       : 'border-gray-300 bg-white text-gray-900 focus:ring-blue-500 focus:border-blue-500',
     select: theme === 'dark'
-      ? 'border-gray-600 bg-gray-700 text-white focus:ring-blue-400'
-      : 'border-gray-300 bg-white text-gray-900 focus:ring-blue-500'
+      ? 'border-gray-600 bg-gray-700 text-white focus:ring-blue-400 appearance-none cursor-pointer'
+      : 'border-gray-300 bg-white text-gray-900 focus:ring-blue-500 appearance-none cursor-pointer'
   };
 
   return (
@@ -483,7 +488,10 @@ const StrategyParametersPanel: React.FC<{
       <div className="flex items-center justify-between mb-4">
         <h3 className={`font-medium ${themeClasses.title}`}>Strategy Parameters</h3>
         <button
-          onClick={() => setIsEditing(!isEditing)}
+          onClick={() => {
+            console.log('Toggle editing mode from', isEditing, 'to', !isEditing);
+            setIsEditing(!isEditing);
+          }}
           className={`px-3 py-1 text-xs rounded-lg transition-colors ${
             isEditing 
               ? 'bg-green-100 text-green-800 hover:bg-green-200'
@@ -498,20 +506,32 @@ const StrategyParametersPanel: React.FC<{
         {/* Universe Selection */}
         <div>
           <h4 className={`font-medium text-sm ${themeClasses.sectionTitle} mb-2`}>Trading Universe</h4>
+          {/* Debug info */}
+          <div className="text-xs text-gray-500 mb-1">
+            Debug: isEditing={isEditing ? 'true' : 'false'}, selectedUniverse="{selectedUniverse}", universes.length={universes.length}
+          </div>
           {isEditing ? (
             <div className="space-y-2">
-              <select
-                value={selectedUniverse}
-                onChange={(e) => handleUniverseChange(e.target.value)}
-                className={`block w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 ${themeClasses.select}`}
-              >
-                <option value="">Select Universe...</option>
-                {universes.map((universe) => (
-                  <option key={universe.id} value={universe.id}>
-                    {universe.name} ({universe.typical_count} symbols)
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <select
+                  value={selectedUniverse}
+                  onChange={(e) => handleUniverseChange(e.target.value)}
+                  className={`block w-full px-3 py-2 pr-10 border rounded-md text-sm focus:outline-none focus:ring-2 ${themeClasses.select}`}
+                >
+                  <option value="">Select Universe...</option>
+                  {universes.map((universe) => (
+                    <option key={universe.id} value={universe.id}>
+                      {universe.name} ({universe.typical_count} symbols)
+                    </option>
+                  ))}
+                </select>
+                {/* Custom dropdown arrow */}
+                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                  <svg className={`w-4 h-4 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </div>
               <div className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
                 {selectedUniverse && universes.find(u => u.id === selectedUniverse)?.description}
               </div>

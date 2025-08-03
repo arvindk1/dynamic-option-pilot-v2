@@ -8,7 +8,7 @@
     "universe_file": "backend/data/universes/thetacrop_symbols.txt",
     "universe_name": "thetacrop",
     "symbol_type": "ETF",
-    "max_symbols": 10,
+    "max_symbols": 13,
     "symbol_selection": "top_by_volume",
     "min_volume": 1000000,
     "min_open_interest": 10000
