@@ -10,7 +10,7 @@
 
 The README contains the definitive project plan, architecture decisions, and development standards that must be followed.
 
-### 🚀 SESSION START CHECKLIST (Updated 2025-08-03)
+### 🚀 SESSION START CHECKLIST (Updated 2025-08-04)
 1. **Read README.md** - Current architecture and migration status
 2. **Check TROUBLESHOOTING_GUIDE.md** - Latest fixes and debugging procedures
 3. **✅ COMPLETED**: V1→V2 strategy migration (13 strategies loaded)
@@ -18,11 +18,15 @@ The README contains the definitive project plan, architecture decisions, and dev
 5. **✅ COMPLETED**: Strategy Sandbox implementation (strategy-specific scans working)
 6. **✅ COMPLETED**: Zero opportunities fix - Trading tab now shows 21+ opportunities
 7. **✅ COMPLETED**: Strategy Sandbox Frontend Fix - Strategies tab now shows all strategies properly
-8. **Verify system status** - `curl http://localhost:8000/health`
-9. **Review recent changes** - Git status and recent commits
-10. **Check opportunities working** - `curl -s http://localhost:8000/api/trading/opportunities | python3 -c "import json,sys; data=json.load(sys.stdin); print(f'Total: {data[\"total_count\"]}')"`
-11. **Test sandbox creation** - `curl -X POST http://localhost:8000/api/sandbox/strategies/ -H "Content-Type: application/json" -d '{"strategy_id": "ThetaCropWeekly", "name": "Test Strategy", "config_data": {"universe": {"universe_name": "thetacrop"}}}'`
-12. **Verify sandbox listing** - `curl http://localhost:8000/api/sandbox/strategies/`
+8. **✅ COMPLETED**: AI Assistant 429 rate limit error fix (intelligent rate limiting with model fallback)
+9. **✅ COMPLETED**: Strategy Sandbox vs Trading conflict resolution (V1 scheduler disabled, clean V2 architecture)
+10. **Verify system status** - `curl http://localhost:8000/health`
+11. **Review recent changes** - Git status and recent commits
+12. **Check opportunities working** - `curl -s http://localhost:8000/api/trading/opportunities | python3 -c "import json,sys; data=json.load(sys.stdin); print(f'Total: {data[\"total_count\"]}')"`
+13. **Test sandbox creation** - `curl -X POST http://localhost:8000/api/sandbox/strategies/ -H "Content-Type: application/json" -d '{"strategy_id": "ThetaCropWeekly", "name": "Test Strategy", "config_data": {"universe": {"universe_name": "thetacrop"}}}'`
+14. **Verify sandbox listing** - `curl http://localhost:8000/api/sandbox/strategies/`
+15. **Check AI Assistant** - `curl http://localhost:8000/api/sandbox/debug/ai-rate-limits`
+16. **Verify no scheduler conflicts** - `curl http://localhost:8000/api/scheduler/status` (should show V2 disabled message)
 
 ### 🔧 V2 DEBUGGING APPROACH
 When encountering issues, follow the V2 debugging methodology:

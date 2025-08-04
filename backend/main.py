@@ -31,7 +31,7 @@ from plugins.analysis.technical_analyzer import TechnicalAnalyzer
 # Import new components
 from models.database import create_tables
 from services.opportunity_cache import initialize_opportunity_cache, get_opportunity_cache
-from core.scheduling.options_scheduler import initialize_options_scheduler, get_options_scheduler
+from core.scheduling.options_scheduler import get_options_scheduler  # initialize_options_scheduler disabled in V2
 
 # Import engine registry
 from core.engines.engine_registry import EngineRegistry
@@ -195,10 +195,13 @@ async def lifespan(app: FastAPI):
         logger.info("💾 Initializing opportunity cache...")
         opportunity_cache = initialize_opportunity_cache(plugin_registry)
         
-        # Initialize options scheduler
-        logger.info("⏰ Initializing options scheduler...")
-        options_scheduler = initialize_options_scheduler(plugin_registry, opportunity_cache)
-        await options_scheduler.start()
+        # Initialize options scheduler - DISABLED for V2 migration
+        # The V2 system uses direct strategy aggregation instead of scheduled background scans
+        # This prevents conflicts between V1 scheduler and V2 strategy systems
+        logger.info("⏰ Options scheduler disabled in V2 - using direct strategy aggregation")
+        # options_scheduler = initialize_options_scheduler(plugin_registry, opportunity_cache)
+        # await options_scheduler.start()
+        options_scheduler = None  # Disabled for V2
         
         # Store in app state
         app.state.event_bus = event_bus
@@ -558,7 +561,13 @@ async def get_scheduler_status():
     """Get scheduler status and statistics."""
     scheduler = get_options_scheduler()
     if not scheduler:
-        raise HTTPException(status_code=503, detail="Scheduler not available")
+        return {
+            "status": "disabled_in_v2",
+            "message": "V1 scheduler disabled - V2 uses direct strategy aggregation",
+            "v2_system": "active",
+            "background_jobs": "none",
+            "note": "Opportunities are generated on-demand via /api/trading/opportunities"
+        }
     
     return scheduler.get_scheduler_status()
 
@@ -568,7 +577,12 @@ async def trigger_manual_scan(strategy: str):
     """Manually trigger a scan for a specific strategy."""
     scheduler = get_options_scheduler()
     if not scheduler:
-        raise HTTPException(status_code=503, detail="Scheduler not available")
+        return {
+            "status": "disabled_in_v2",
+            "message": f"V1 scheduler disabled - use /api/strategies/{strategy}/quick-scan instead",
+            "alternative_endpoint": f"/api/strategies/{strategy}/quick-scan",
+            "v2_note": "Individual strategy scans available via strategy-specific endpoints"
+        }
     
     success = await scheduler.trigger_manual_scan(strategy)
     if success:
@@ -644,12 +658,35 @@ async def get_risk_metrics():
         
         # Aggregate risk metrics from all available opportunities 
         all_opportunities = []
-        for strategy in ["high_probability", "quick_scalp", "theta_decay"]:
-            opportunities = await cache.get_opportunities(strategy)
-            if isinstance(opportunities, dict) and 'opportunities' in opportunities:
-                all_opportunities.extend(opportunities['opportunities'])
-            elif isinstance(opportunities, list):
-                all_opportunities.extend(opportunities)
+        
+        # Use V2 strategy system instead of hardcoded V1 strategy names
+        try:
+            
+            # Get current opportunities for risk analysis
+            strategy_registry = get_strategy_registry()
+            if strategy_registry:
+                # Use actual V2 strategy names
+                v2_strategies = strategy_registry.list_strategies()[:3]  # Limit for performance
+                for strategy_info in v2_strategies:
+                    strategy_name = strategy_info.get('id', strategy_info.get('name', ''))
+                    if strategy_name:
+                        opportunities = await cache.get_opportunities(strategy_name)
+                        if isinstance(opportunities, dict) and 'opportunities' in opportunities:
+                            all_opportunities.extend(opportunities['opportunities'])
+                        elif isinstance(opportunities, list):
+                            all_opportunities.extend(opportunities)
+            else:
+                # Fallback: get from current trading opportunities
+                trading_response = await get_trading_opportunities_direct(max_per_strategy=3)
+                if isinstance(trading_response, dict) and 'opportunities' in trading_response:
+                    all_opportunities = trading_response['opportunities'][:15]  # Limit for performance
+                    
+        except Exception as e:
+            logger.warning(f"Could not get V2 strategies for risk analysis: {e}")
+            # Final fallback to current trading opportunities
+            trading_response = await get_trading_opportunities_direct(max_per_strategy=5)
+            if isinstance(trading_response, dict) and 'opportunities' in trading_response:
+                all_opportunities = trading_response['opportunities'][:20]
         
         if not all_opportunities:
             # Return empty state instead of error when no positions

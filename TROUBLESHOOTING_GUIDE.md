@@ -12,7 +12,54 @@
 
 ## 🚨 Common Issues & Fixes Applied (2025-08-04)
 
-### **LATEST**: AI Assistant 429 Rate Limit Error - FIXED (COMPLETED)
+### **LATEST**: Strategy Sandbox vs Trading Conflict - FIXED (COMPLETED)
+**Issue**: Strategy Sandbox working perfectly but Trading opportunities showing errors in logs: "Strategy scanning failed for None - no fallback provided" and "Strategy registry unavailable"
+**Root Cause**: V1 scheduler system running background jobs with old strategy names conflicting with V2 strategy system
+**Symptoms**:
+- Background errors in logs with strategy_scan_failure messages
+- V1 scheduler trying to use unavailable strategy registry 
+- Multiple systems running simultaneously causing conflicts
+- Trading opportunities working but with error spam in logs
+
+**Architecture Issue Identified**: Three systems running simultaneously:
+1. **V1 Scheduler system** (background jobs with old strategy names) ❌ **FAILING**
+2. **V1 Opportunity cache** (using strategy registry) ❌ **FAILING** 
+3. **V2 Direct strategy aggregation** (JSON strategies) ✅ **WORKING**
+
+**Fix Applied**: Disabled V1 scheduler system to eliminate conflicts
+```python
+# BEFORE (conflicting systems): V1 scheduler running background scans
+options_scheduler = initialize_options_scheduler(plugin_registry, opportunity_cache)
+await options_scheduler.start()
+
+# AFTER (clean V2 system): V1 scheduler disabled, V2 only
+logger.info("⏰ Options scheduler disabled in V2 - using direct strategy aggregation")
+options_scheduler = None  # Disabled for V2
+```
+
+**V2 Architecture Benefits**:
+- ✅ **No background job conflicts**: On-demand opportunity generation only
+- ✅ **Clean separation**: Strategy Sandbox and Trading use same V2 system
+- ✅ **Better performance**: No competing systems scanning simultaneously
+- ✅ **Eliminates error spam**: No more strategy registry failures in logs
+- ✅ **Graceful endpoint handling**: Scheduler endpoints return V2 migration messages
+
+**Verification Commands**:
+```bash
+# Trading opportunities still working (28 opportunities)
+curl http://localhost:8000/api/trading/opportunities
+
+# Scheduler properly disabled with V2 message
+curl http://localhost:8000/api/scheduler/status
+
+# Strategy Sandbox still working (6 user strategies)
+curl http://localhost:8000/api/sandbox/strategies/
+
+# No more background errors in logs
+tail -f backend/logs/backend.log | grep strategy_scan_failure  # Should be empty
+```
+
+### AI Assistant 429 Rate Limit Error - FIXED (COMPLETED)
 **Issue**: AI Assistant returning "Error code: 429" with message "You excee..." (rate limit exceeded)
 **Root Cause**: OpenAI API rate limiting without proper retry logic and fallback mechanisms
 **Symptoms**:
