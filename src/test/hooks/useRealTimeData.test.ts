@@ -1,4 +1,4 @@
-import { renderHook } from '@testing-library/react'
+import { renderHook, act } from '@testing-library/react'
 import { useRealTimeData } from '@/hooks/useRealTimeData'
 
 // Mock the dependencies
@@ -59,7 +59,10 @@ describe('useRealTimeData', () => {
   })
 
   it('initializes with default values', () => {
-    const { result } = renderHook(() => useRealTimeData())
+    let result: any;
+    act(() => {
+      result = renderHook(() => useRealTimeData()).result;
+    });
     
     expect(result.current.marketData).toBeDefined()
     expect(result.current.performanceData).toEqual([])
@@ -68,7 +71,10 @@ describe('useRealTimeData', () => {
   })
 
   it('provides market data interface', () => {
-    const { result } = renderHook(() => useRealTimeData())
+    let result: any;
+    act(() => {
+      result = renderHook(() => useRealTimeData()).result;
+    });
     
     expect(result.current.marketData).toHaveProperty('price')
     expect(result.current.marketData).toHaveProperty('volume')
@@ -78,7 +84,10 @@ describe('useRealTimeData', () => {
   })
 
   it('provides trading signals with default values', () => {
-    const { result } = renderHook(() => useRealTimeData())
+    let result: any;
+    act(() => {
+      result = renderHook(() => useRealTimeData()).result;
+    });
     
     expect(result.current.signals).toBeDefined()
     expect(result.current.signals.market_bias).toBe('NEUTRAL')
@@ -86,13 +95,19 @@ describe('useRealTimeData', () => {
   })
 
   it('provides performance tracking functions', () => {
-    const { result } = renderHook(() => useRealTimeData())
+    let result: any;
+    act(() => {
+      result = renderHook(() => useRealTimeData()).result;
+    });
     
     expect(typeof result.current.addPerformancePoint).toBe('function')
   })
 
   it('provides connection status information', () => {
-    const { result } = renderHook(() => useRealTimeData())
+    let result: any;
+    act(() => {
+      result = renderHook(() => useRealTimeData()).result;
+    });
     
     expect(result.current.connectionStatus).toBeDefined()
     expect(typeof result.current.usingWebSocket).toBe('boolean')

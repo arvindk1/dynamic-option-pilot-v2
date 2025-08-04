@@ -28,9 +28,11 @@ const mockFetch = (url: string | Request | undefined, options?: RequestInit) => 
     return Promise.resolve({
       ok: true,
       json: async () => ({
+        status: 'success',
         message: 'Positions synced successfully',
-        positions_updated: 5,
-        success: true
+        sync_results: {
+          synced_positions: 5,
+        }
       })
     } as Response)
   }

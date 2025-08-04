@@ -1,0 +1,111 @@
+{
+  "$schema": "https://claude.ai/schemas/settings.json",
+  "project": {
+    "name": "Dynamic Options Pilot v2",
+    "description": "Algorithmic Options Trading Platform - Strategy Development Mode",
+    "focus": "strategy_sandbox_improvements"
+  },
+  "file_protection": {
+    "protected_paths": [
+      "backend/models/",
+      "backend/core/",
+      "backend/main.py",
+      "src/main.tsx",
+      "package.json",
+      "package-lock.json",
+      "requirements.txt",
+      "vite.config.ts",
+      "tsconfig.json",
+      "tailwind.config.ts",
+      "postcss.config.js",
+      ".env*",
+      "docker-compose.yml",
+      "Dockerfile",
+      ".github/",
+      "backend/models/database.py",
+      "backend/models/opportunity.py",
+      "backend/core/orchestrator/",
+      "backend/core/engines/",
+      "backend/core/interfaces/",
+      "src/contexts/ThemeContext.tsx",
+      "src/lib/utils.ts",
+      "src/hooks/useWebSocket.ts"
+    ],
+    "allowed_paths": [
+      "backend/plugins/trading/",
+      "backend/config/strategies/",
+      "backend/services/sandbox_service.py",
+      "backend/api/sandbox.py",
+      "src/components/StrategiesTab.tsx",
+      "backend/data/universes/",
+      "strategies/",
+      "CLAUDE.md",
+      "README.md",
+      "TROUBLESHOOTING_GUIDE.md",
+      "STRATEGY_CONFIGURATION_GUIDE.md",
+      "ADDING_NEW_STRATEGIES.md"
+    ],
+    "require_confirmation": [
+      "backend/main.py",
+      "src/main.tsx",
+      "package.json",
+      "backend/models/",
+      "backend/core/"
+    ]
+  },
+  "work_scope": {
+    "current_focus": "strategy_sandbox_development",
+    "allowed_operations": [
+      "strategy_configuration",
+      "sandbox_ui_improvements", 
+      "trading_universe_management",
+      "strategy_testing_features",
+      "documentation_updates"
+    ],
+    "restricted_operations": [
+      "core_system_changes",
+      "database_schema_modifications",
+      "authentication_changes",
+      "build_configuration_changes",
+      "dependency_management"
+    ]
+  },
+  "safety_rules": {
+    "always_ask_before": [
+      "modifying protected files",
+      "changing database models",
+      "updating core dependencies",
+      "modifying main application entry points",
+      "changing build or deployment configurations"
+    ],
+    "never_modify_without_permission": [
+      "backend/models/database.py",
+      "backend/core/orchestrator/plugin_registry.py",
+      "src/main.tsx",
+      "package.json",
+      "vite.config.ts"
+    ],
+    "git_integration": {
+      "create_branch_for_changes": true,
+      "commit_frequency": "after_each_logical_change",
+      "protection_check": true
+    }
+  },
+  "development_guidelines": {
+    "preferred_approach": "incremental_changes",
+    "testing_required": true,
+    "documentation_updates": "automatic",
+    "backup_before_major_changes": true
+  },
+  "notifications": {
+    "warn_on_protected_file_access": true,
+    "confirm_before_cross_boundary_changes": true,
+    "log_all_file_modifications": true
+  },
+  "context_awareness": {
+    "read_project_docs_first": true,
+    "check_recent_changes": true,
+    "understand_architecture": true,
+    "focus_on_strategy_work": true
+  }
+}
