@@ -81,7 +81,17 @@ async def lifespan(app: FastAPI):
         
         # Register plugin classes
         plugin_registry.register_plugin_class(YFinanceProvider)
-        plugin_registry.register_plugin_class(AlpacaProvider)
+        
+        # Choose data provider based on environment (rate limit avoidance)
+        use_cached_data = os.getenv('USE_CACHED_DATA', 'false').lower() == 'true'
+        if use_cached_data:
+            logger.info("📁 Using cached data provider (rate limit avoidance mode)")
+            from plugins.data.cached_provider import CachedDataProvider
+            plugin_registry.register_plugin_class(CachedDataProvider)
+        else:
+            logger.info("🔴 Using live Alpaca provider")  
+            plugin_registry.register_plugin_class(AlpacaProvider)
+        
         plugin_registry.register_plugin_class(TechnicalAnalyzer)
         
         # Create plugin instances with configurations
@@ -210,6 +220,13 @@ async def lifespan(app: FastAPI):
         app.state.options_scheduler = options_scheduler
         app.state.strategy_registry = strategy_registry
         
+        # Initialize and start market commentary scheduler
+        logger.info("📰 Starting market commentary scheduler...")
+        from utils.commentary_scheduler import get_commentary_scheduler
+        commentary_scheduler = get_commentary_scheduler()
+        commentary_scheduler.start_scheduler()
+        app.state.commentary_scheduler = commentary_scheduler
+        
         logger.info("✅ Application startup complete")
         yield
         
@@ -220,6 +237,12 @@ async def lifespan(app: FastAPI):
         logger.info("🛑 Shutting down application")
         if options_scheduler:
             await options_scheduler.stop()
+        
+        # Cleanup market commentary scheduler
+        if hasattr(app.state, 'commentary_scheduler') and app.state.commentary_scheduler:
+            app.state.commentary_scheduler.stop_scheduler()
+            logger.info("📰 Market commentary scheduler stopped")
+            
         if strategy_registry:
             await strategy_registry.cleanup_all()
         if plugin_registry:
@@ -505,11 +528,13 @@ async def event_stream():
 
 
 # Import routers
-from api.routes import dashboard
+from api.routes import dashboard, ai_coach, risk_metrics
 from api import sandbox
 
 # Include routers
 app.include_router(dashboard.router, prefix="/api/dashboard", tags=["dashboard"])
+app.include_router(ai_coach.router, prefix="/api/ai-coach", tags=["ai-coach"])
+app.include_router(risk_metrics.router, prefix="/api/risk", tags=["risk-metrics"])
 app.include_router(sandbox.router, tags=["sandbox"])
 
 
@@ -2309,18 +2334,42 @@ async def get_trading_opportunities_direct(strategy: str = None, symbols: str = 
                             return float(value)
                         return default
                     
+                    # Map strategy_type to user-friendly strategy name
+                    strategy_name_map = {
+                        'PROTECTIVE_PUT': 'Protective Put',
+                        'IRON_CONDOR': 'Iron Condor', 
+                        'BUTTERFLY': 'Butterfly Spread',
+                        'STRADDLE': 'Straddle',
+                        'STRANGLE': 'Strangle',
+                        'RSI_COUPON': 'RSI Coupon Strategy',
+                        'THETA_HARVESTING': 'Theta Harvesting',
+                        'NAKED_OPTION': 'Single Option',
+                        'COLLAR': 'Collar',
+                        'COVERED_CALL': 'Covered Call',
+                        'VERTICAL_SPREAD': 'Vertical Spread',
+                        'CALENDAR_SPREAD': 'Calendar Spread',
+                        'CREDIT_SPREAD': 'Credit Spread'
+                    }
+                    
+                    strategy_display_name = strategy_name_map.get(opp.strategy_type, opp.strategy_type.replace('_', ' ').title())
+                    
                     opp_dict = {
                         "id": opp.id,
                         "symbol": opp.symbol,
                         "strategy_type": opp.strategy_type,
+                        "strategy": strategy_display_name,  # Add frontend-expected field
                         "short_strike": clean_float(getattr(opp, 'short_strike', 0)),
                         "long_strike": clean_float(getattr(opp, 'long_strike', 0)),
                         "premium": clean_float(opp.premium),
                         "max_loss": clean_float(getattr(opp, 'max_loss', 0)),
                         "delta": clean_float(getattr(opp, 'delta', 0)),
+                        "gamma": clean_float(getattr(opp, 'gamma', 0)),  # Add missing Greek
+                        "theta": clean_float(getattr(opp, 'theta', 0)),  # Add missing Greek
+                        "vega": clean_float(getattr(opp, 'vega', 0)),    # Add missing Greek
                         "probability_profit": clean_float(opp.probability_profit),
                         "expected_value": clean_float(opp.expected_value),
                         "days_to_expiration": int(opp.days_to_expiration or 0),
+                        "expiration": getattr(opp, 'expiration', None),  # Add missing expiration date
                         "underlying_price": clean_float(opp.underlying_price),
                         "liquidity_score": clean_float(getattr(opp, 'liquidity_score', 5.0), 5.0),
                         "bias": getattr(opp, 'bias', 'NEUTRAL'),

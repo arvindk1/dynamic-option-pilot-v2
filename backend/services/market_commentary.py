@@ -53,9 +53,17 @@ class MarketCommentaryService:
             {"symbol": "TSLA", "when": "After Market Close", "consensus": "Delivery Numbers Key"},
             {"symbol": "META", "when": "After Market Close", "consensus": "Metaverse Investment Impact"},
             {"symbol": "AMZN", "when": "After Market Close", "consensus": "Cloud Growth Critical"},
+            {"symbol": "NFLX", "when": "After Market Close", "consensus": "Subscriber Growth Focus"},
+            {"symbol": "CRM", "when": "After Market Close", "consensus": "Enterprise Demand Strong"},
+            {"symbol": "ADBE", "when": "After Market Close", "consensus": "Creative Cloud Momentum"},
         ]
         
-        # Randomly select 2-3 earnings for today
+        # Use date-based seed for daily rotation but consistent within day
+        current_date = datetime.utcnow().date()
+        date_seed = int(current_date.strftime("%Y%m%d"))
+        random.seed(date_seed)
+        
+        # Randomly select 2-3 earnings for today (changes daily)
         selected_earnings = random.sample(potential_earnings, min(3, len(potential_earnings)))
         
         earnings_notes = []

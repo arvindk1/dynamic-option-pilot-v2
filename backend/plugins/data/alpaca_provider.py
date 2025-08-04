@@ -8,6 +8,7 @@ import logging
 
 from core.orchestrator.base_plugin import DataProviderPlugin, PluginMetadata, PluginType, PluginConfig
 from core.interfaces.data_provider_interface import IDataProvider
+from services.greeks_calculator import calculate_position_greeks
 
 logger = logging.getLogger(__name__)
 
@@ -356,6 +357,87 @@ class AlpacaProvider(DataProviderPlugin, IDataProvider):
         except Exception:
             return None
     
+    async def _add_greeks_to_positions(self, position_data: List[Dict[str, Any]]):
+        """Add Greeks calculations to options positions"""
+        try:
+            # Group positions by underlying to get current prices
+            underlyings = {}
+            options_positions = []
+            
+            for position in position_data:
+                if position.get('type') in ['CALL', 'PUT']:
+                    underlying = position.get('underlying', position.get('symbol', '').replace('250829C00660000', '').replace('250829C00670000', '').replace('250829P00600000', '').replace('250829P00610000', ''))
+                    
+                    # Try to extract underlying from symbol if not already set
+                    if not underlying and len(position.get('symbol', '')) > 3:
+                        # For symbols like SPY250829C00660000, extract SPY
+                        symbol = position.get('symbol', '')
+                        for i, char in enumerate(symbol):
+                            if char.isdigit():
+                                underlying = symbol[:i]
+                                break
+                    
+                    if underlying:
+                        underlyings[underlying] = None  # Will fetch price
+                        options_positions.append(position)
+            
+            # Fetch current prices for underlyings
+            for underlying in underlyings.keys():
+                try:
+                    market_data = await self.get_market_data(underlying)
+                    underlyings[underlying] = market_data.get('price', 0.0)
+                except Exception as e:
+                    self._logger.warning(f"Could not get price for {underlying}: {e}")
+                    underlyings[underlying] = 0.0
+            
+            # Calculate Greeks for each options position
+            for position in options_positions:
+                underlying = position.get('underlying')
+                if not underlying:
+                    # Try to extract from symbol again
+                    symbol = position.get('symbol', '')
+                    for i, char in enumerate(symbol):
+                        if char.isdigit():
+                            underlying = symbol[:i]
+                            break
+                
+                if underlying and underlying in underlyings:
+                    underlying_price = underlyings[underlying]
+                    if underlying_price > 0:
+                        # Use implied volatility based on underlying (rough estimates)
+                        iv_estimates = {
+                            'SPY': 0.18,   # S&P 500 ETF
+                            'QQQ': 0.25,   # NASDAQ ETF  
+                            'IWM': 0.28,   # Russell 2000 ETF
+                            'GLD': 0.20,   # Gold ETF
+                            'TLT': 0.15,   # Treasury ETF
+                        }
+                        
+                        implied_vol = iv_estimates.get(underlying, 0.22)  # Default 22% IV
+                        
+                        # Calculate Greeks using our calculator
+                        position_with_greeks = calculate_position_greeks(
+                            position, 
+                            underlying_price, 
+                            implied_vol
+                        )
+                        
+                        # Update the original position with Greeks
+                        position.update({
+                            'delta': position_with_greeks.get('delta', 0.0),
+                            'gamma': position_with_greeks.get('gamma', 0.0),
+                            'theta': position_with_greeks.get('theta', 0.0),
+                            'vega': position_with_greeks.get('vega', 0.0),
+                            'rho': position_with_greeks.get('rho', 0.0)
+                        })
+                        
+                        self._logger.debug(f"Calculated Greeks for {position.get('symbol')}: "
+                                         f"Delta={position.get('delta'):.3f}")
+            
+        except Exception as e:
+            self._logger.error(f"Error calculating Greeks: {e}")
+            # Don't fail the entire position loading if Greeks calculation fails
+    
     async def validate_symbol(self, symbol: str) -> bool:
         """Validate if symbol is supported by Alpaca."""
         if not self.client:
@@ -393,11 +475,11 @@ class AlpacaProvider(DataProviderPlugin, IDataProvider):
                     "entry_price": float(position.avg_entry_price),
                     "current_price": float(position.current_price) if position.current_price else 0.0,
                     "market_value": float(position.market_value) if position.market_value else 0.0,
-                    "pnl": float(position.unrealized_pl) if position.unrealized_pl else 0.0,
-                    "pnl_percentage": float(position.unrealized_plpc) * 100 if position.unrealized_plpc else 0.0,
+                    "pnl": float(getattr(position, 'unrealized_pl', 0.0)),
+                    "pnl_percentage": float(getattr(position, 'unrealized_plpc', 0.0)) * 100,
                     "side": position.side,
                     "status": "OPEN" if float(position.qty) != 0 else "CLOSED",
-                    "entry_date": None,  # Alpaca Position objects don't have created_at
+                    "entry_date": datetime.now(timezone.utc).isoformat(),  # TODO: Get actual entry date from orders/activities
                     "type": "STOCK"  # Default to stock, will be enhanced for options
                 }
                 
@@ -407,13 +489,16 @@ class AlpacaProvider(DataProviderPlugin, IDataProvider):
                     option_info = self._parse_option_symbol(position.symbol)
                     if option_info:
                         position_dict.update({
-                            "type": f"{option_info['option_type']}UT",  # CALL or PUT
+                            "type": "CALL" if option_info['option_type'] == 'C' else "PUT",
                             "strike": option_info['strike'],
                             "expiration": option_info['expiration'].isoformat(),
                             "underlying": option_info['underlying']
                         })
                 
                 position_data.append(position_dict)
+            
+            # Calculate Greeks for options positions
+            await self._add_greeks_to_positions(position_data)
             
             self._logger.info(f"✅ Retrieved {len(position_data)} positions from Alpaca")
             return position_data
@@ -437,14 +522,14 @@ class AlpacaProvider(DataProviderPlugin, IDataProvider):
                 "cash": float(account.cash),
                 "buying_power": float(account.buying_power),
                 "account_status": account.status,
-                "total_pnl": float(account.unrealized_pl) if account.unrealized_pl else 0.0,
-                "day_trade_count": account.daytrade_count,
-                "pattern_day_trader": account.pattern_day_trader,
-                "trade_suspended_by_user": account.trade_suspended_by_user,
-                "trading_blocked": account.trading_blocked,
-                "transfers_blocked": account.transfers_blocked,
-                "account_blocked": account.account_blocked,
-                "created_at": account.created_at.isoformat() if account.created_at else None,
+                "total_pnl": 0.0,  # Will be calculated from positions
+                "day_trade_count": getattr(account, 'daytrade_count', 0),
+                "pattern_day_trader": getattr(account, 'pattern_day_trader', False),
+                "trade_suspended_by_user": getattr(account, 'trade_suspended_by_user', False),
+                "trading_blocked": getattr(account, 'trading_blocked', False),
+                "transfers_blocked": getattr(account, 'transfers_blocked', False),
+                "account_blocked": getattr(account, 'account_blocked', False),
+                "created_at": account.created_at.isoformat() if hasattr(account, 'created_at') and account.created_at else None,
                 "last_updated": datetime.now(timezone.utc).isoformat()
             }
             

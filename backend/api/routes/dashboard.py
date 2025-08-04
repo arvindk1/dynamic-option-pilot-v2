@@ -2,24 +2,102 @@ from fastapi import APIRouter, HTTPException
 from typing import Dict, Any
 from datetime import datetime
 import logging
+import os
+
+from plugins.data.alpaca_provider import AlpacaProvider
+from core.orchestrator.base_plugin import PluginConfig
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+# Global Alpaca provider instance
+_alpaca_provider = None
+
+async def get_alpaca_provider() -> AlpacaProvider:
+    """Get or create Alpaca provider instance."""
+    global _alpaca_provider
+    
+    if _alpaca_provider is None:
+        config = PluginConfig(
+            settings={
+                'api_key': os.getenv('ALPACA_API_KEY'),
+                'secret_key': os.getenv('ALPACA_SECRET_KEY'),
+                'paper_trading': os.getenv('PAPER_TRADING', 'true').lower() == 'true'
+            }
+        )
+        
+        _alpaca_provider = AlpacaProvider(config)
+        await _alpaca_provider.initialize()
+    
+    return _alpaca_provider
+
+async def check_broker_connection() -> bool:
+    """Check if broker (Alpaca) is connected and available."""
+    try:
+        provider = await get_alpaca_provider()
+        # Test connection by getting account info
+        account_info = await provider.get_account_info()
+        return bool(account_info.get('account_id'))
+    except Exception as e:
+        logger.warning(f"Broker connection check failed: {e}")
+        return False
+
 @router.get("/metrics")
 async def get_metrics() -> Dict[str, Any]:
-    """Get dashboard metrics - simplified version for v2.0"""
+    """Get dashboard metrics - uses real Alpaca data when available"""
     try:
         current_timestamp = datetime.utcnow().isoformat() + "Z"
         
-        # TODO: Check if real broker API is available
-        # broker_connected = await check_broker_connection()
-        broker_connected = False  # For now, no broker connected
+        # Check if real broker API is available
+        broker_connected = await check_broker_connection()
         
         if broker_connected:
-            # Would return real broker data here
-            pass
-        else:
+            # Return real Alpaca broker data
+            try:
+                provider = await get_alpaca_provider()
+                account_info = await provider.get_account_info()
+                positions = await provider.get_positions()
+                
+                # Calculate basic trading metrics from positions
+                open_positions = len([p for p in positions if p.get('status') == 'OPEN'])
+                total_pnl = sum(p.get('pnl', 0) for p in positions)
+                
+                return {
+                    "data_state": "live",
+                    "broker": "Alpaca Paper Trading" if os.getenv('PAPER_TRADING', 'true').lower() == 'true' else "Alpaca Live",
+                    
+                    # Real account data from Alpaca
+                    "account_balance": account_info.get('account_balance', 0.0),
+                    "cash": account_info.get('cash', 0.0),
+                    "buying_power": account_info.get('buying_power', 0.0),
+                    "account_status": account_info.get('account_status', 'UNKNOWN'),
+                    "account_id": account_info.get('account_id', 'N/A'),
+                    
+                    # Trading statistics from positions
+                    "total_pnl": total_pnl,
+                    "pnl_percentage": (total_pnl / account_info.get('account_balance', 1)) * 100 if account_info.get('account_balance', 0) > 0 else 0.0,
+                    "today_pnl": 0.0,  # Would need daily tracking
+                    "positions_open": open_positions,
+                    
+                    # Default/calculated values
+                    "win_rate": 0.0,  # Would need trade history analysis
+                    "total_trades": len(positions),
+                    "winning_trades": 0,  # Would need trade analysis
+                    "sharpe_ratio": 0.0,  # Would need historical performance data
+                    "max_drawdown": 0.0,  # Would need historical performance data
+                    
+                    # Market data indicators (defaults for now)
+                    "vix": 18.5,  # Would get from market data provider
+                    "iv_rank": 0.45,  # Would calculate from options data
+                    
+                    "last_updated": current_timestamp,
+                    "is_demo": False
+                }
+            except Exception as e:
+                logger.error(f"Error getting real broker data, falling back to demo: {e}")
+                broker_connected = False  # Fall through to demo data
+        
+        if not broker_connected:
             # Return demo data with clear state indicators
             return {
                 "data_state": "demo",

@@ -37,6 +37,7 @@ interface EnhancedTradeOpportunity {
   id: string;
   symbol: string;
   strategy_type: string;
+  strategy?: string;  // Backend-formatted display name
   option_type?: string;
   strike?: number;
   short_strike?: number;
@@ -147,9 +148,10 @@ export const EnhancedTradingCard: React.FC<EnhancedTradingCardProps> = ({
 
   // Strategy display helper
   const getStrategyDisplay = () => {
-    const type = opportunity.strategy_type.replace('_', ' ');
+    // Use the backend-formatted 'strategy' field if available, otherwise fallback to transforming strategy_type
+    const displayName = opportunity.strategy || opportunity.strategy_type.replace('_', ' ');
     const optionType = opportunity.option_type || '';
-    return `${type} ${optionType}`.trim();
+    return `${displayName} ${optionType}`.trim();
   };
 
   return (
