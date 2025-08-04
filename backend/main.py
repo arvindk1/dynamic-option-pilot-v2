@@ -124,14 +124,14 @@ async def lifespan(app: FastAPI):
         engine_registry = EngineRegistry(plugin_registry)
         
         # Load configuration for engine registry
-        engine_config = {
-            'data': {
-                'primary_provider': 'yfinance',
-                'fallback_providers': ['yfinance'],
-                'cache_enabled': True,
-                'rate_limit_ms': 100
-            }
-        }
+        try:
+            import json
+            with open('config/engine_config.json', 'r') as f:
+                engine_config = json.load(f)
+            logger.info("✅ Loaded engine configuration from file")
+        except FileNotFoundError:
+            logger.error("❌ Engine configuration file not found")
+            raise RuntimeError("Engine configuration file 'config/engine_config.json' not found")
         
         await engine_registry.initialize(engine_config)
         register_singleton(EngineRegistry, engine_registry)
@@ -164,23 +164,22 @@ async def lifespan(app: FastAPI):
             logger.info("📈 Registering ThetaCrop Weekly strategy...")
             thetacrop_config = config_loader.load_strategy_config('thetacrop_weekly')
             if thetacrop_config:
-                # Extract strategy configuration
-                strategy_data = thetacrop_config['strategy']
-                trading_data = thetacrop_config['trading']
-                risk_data = thetacrop_config['risk']
+                # Extract configuration from actual JSON structure
+                position_params = thetacrop_config.get('position_parameters', {})
+                risk_mgmt = thetacrop_config.get('risk_management', {})
+                universe_config = thetacrop_config.get('universe', {})
                 
-                # Create StrategyConfig (only use supported parameters)
                 strategy_config = StrategyConfig(
-                    strategy_id=strategy_data['id'],
-                    name=strategy_data['name'],
-                    category=strategy_data['category'],
-                    min_dte=min(trading_data['target_dte_range']),
-                    max_dte=max(trading_data['target_dte_range']),
-                    min_probability=0.70,  # Default high probability threshold
-                    max_opportunities=trading_data['max_positions'],
-                    symbols=thetacrop_config.get('universe', {}).get('primary_symbols', ['SPY', 'QQQ', 'IWM']),
-                    min_liquidity_score=thetacrop_config.get('market_conditions', {}).get('min_liquidity_score', 7.0),
-                    max_risk_per_trade=500.0  # Default risk limit
+                    strategy_id='thetacrop_weekly',
+                    name=thetacrop_config.get('strategy_name', 'ThetaCrop Weekly'),
+                    category=thetacrop_config.get('strategy_type', 'THETA_HARVESTING'),
+                    min_dte=min(position_params.get('target_dte_range', [5, 10])),
+                    max_dte=max(position_params.get('target_dte_range', [5, 10])),
+                    min_probability=risk_mgmt.get('var_limit_percentage', 2.0) / 100.0,
+                    max_opportunities=position_params.get('max_positions', 5),
+                    symbols=[],  # Load from universe file
+                    min_liquidity_score=universe_config.get('min_open_interest', 10000) / 10000.0,
+                    max_risk_per_trade=risk_mgmt.get('max_allocation_percentage', 15) * 100.0
                 )
                 
                 # Register the strategy
@@ -749,22 +748,67 @@ async def get_risk_metrics():
 @app.get("/api/positions/")
 async def get_positions(sync: bool = False):
     """Get current positions."""
-    return []  # Empty for now - will be implemented with real broker integration
+    try:
+        # Get Alpaca provider instance
+        alpaca_provider = plugin_registry.get_plugin("alpaca_provider") if plugin_registry else None
+        
+        if not alpaca_provider:
+            logger.warning("Alpaca provider not available, returning empty positions")
+            return []
+        
+        # Fetch positions from Alpaca
+        positions = await alpaca_provider.get_positions()
+        logger.info(f"Retrieved {len(positions)} positions from Alpaca")
+        return positions
+        
+    except Exception as e:
+        logger.error(f"Error fetching positions: {e}")
+        return []
 
 
 # Position sync endpoint
 @app.post("/api/positions/sync")
 async def sync_positions():
     """Sync positions with broker."""
-    return {
-        "status": "success",
-        "message": "Demo mode: No real positions to sync",
-        "sync_results": {
-            "synced_positions": 0,
-            "new_positions": 0,
-            "updated_positions": 0
+    try:
+        # Get Alpaca provider instance
+        alpaca_provider = plugin_registry.get_plugin("alpaca_provider") if plugin_registry else None
+        
+        if not alpaca_provider:
+            return {
+                "status": "error",
+                "message": "Alpaca provider not available",
+                "sync_results": {
+                    "synced_positions": 0,
+                    "new_positions": 0,
+                    "updated_positions": 0
+                }
+            }
+        
+        # Fetch fresh positions from Alpaca
+        positions = await alpaca_provider.get_positions()
+        
+        return {
+            "status": "success",
+            "message": f"Successfully synced {len(positions)} positions from Alpaca",
+            "sync_results": {
+                "synced_positions": len(positions),
+                "new_positions": len(positions),  # For now, treat all as new
+                "updated_positions": 0
+            }
         }
-    }
+        
+    except Exception as e:
+        logger.error(f"Error syncing positions: {e}")
+        return {
+            "status": "error", 
+            "message": f"Failed to sync positions: {str(e)}",
+            "sync_results": {
+                "synced_positions": 0,
+                "new_positions": 0,
+                "updated_positions": 0
+            }
+        }
 
 
 # Close position endpoint
@@ -1270,9 +1314,9 @@ async def scan_individual_strategy(strategy_id: str, symbol: Optional[str] = "SP
                 "days_to_expiration": opp.days_to_expiration,
                 "underlying_price": opp.underlying_price,
                 "liquidity_score": opp.liquidity_score,
-                "bias": opp.market_bias,
+                "bias": getattr(opp, 'bias', 'NEUTRAL'),
                 "rsi": getattr(opp, 'rsi', 50.0),
-                "created_at": opp.created_at.isoformat(),
+                "created_at": getattr(opp, 'generated_at', datetime.utcnow()).isoformat(),
                 "scan_source": "individual_strategy_scan",
                 "universe": opp.universe or "default"
             }
@@ -2242,7 +2286,7 @@ async def get_trading_opportunities_direct(strategy: str = None, symbols: str = 
                         "days_to_expiration": int(opp.days_to_expiration or 0),
                         "underlying_price": clean_float(opp.underlying_price),
                         "liquidity_score": clean_float(getattr(opp, 'liquidity_score', 5.0), 5.0),
-                        "bias": getattr(opp, 'market_bias', 'NEUTRAL'),
+                        "bias": getattr(opp, 'bias', 'NEUTRAL'),
                         "rsi": clean_float(getattr(opp, 'rsi', 50.0), 50.0),
                         "created_at": getattr(opp, 'created_at', datetime.utcnow()).isoformat(),
                         "is_demo": False,
@@ -2282,11 +2326,12 @@ async def get_trading_opportunities_direct(strategy: str = None, symbols: str = 
 
 
 if __name__ == "__main__":
+    import os
     import uvicorn
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
-        port=8000,
+        port=int(os.getenv("PORT", 8000)),
         reload=True,
         log_level="info"
     )

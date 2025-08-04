@@ -373,3 +373,81 @@ class AlpacaProvider(DataProviderPlugin, IDataProvider):
         except Exception:
             # If we can't get a quote, assume symbol is invalid
             return False
+    
+    async def get_positions(self) -> List[Dict[str, Any]]:
+        """Get all positions from Alpaca account."""
+        if not self.client:
+            self._logger.error("❌ Alpaca client not initialized")
+            return []
+        
+        try:
+            positions = self.client.list_positions()
+            position_data = []
+            
+            for position in positions:
+                # Convert position to our standard format
+                position_dict = {
+                    "id": position.symbol,  # Use symbol as ID for now
+                    "symbol": position.symbol,
+                    "quantity": float(position.qty),
+                    "entry_price": float(position.avg_entry_price),
+                    "current_price": float(position.current_price) if position.current_price else 0.0,
+                    "market_value": float(position.market_value) if position.market_value else 0.0,
+                    "pnl": float(position.unrealized_pl) if position.unrealized_pl else 0.0,
+                    "pnl_percentage": float(position.unrealized_plpc) * 100 if position.unrealized_plpc else 0.0,
+                    "side": position.side,
+                    "status": "OPEN" if float(position.qty) != 0 else "CLOSED",
+                    "entry_date": None,  # Alpaca Position objects don't have created_at
+                    "type": "STOCK"  # Default to stock, will be enhanced for options
+                }
+                
+                # Try to detect if this is an options position
+                if len(position.symbol) > 6 and any(char in position.symbol for char in ['C', 'P']):
+                    # This might be an options symbol
+                    option_info = self._parse_option_symbol(position.symbol)
+                    if option_info:
+                        position_dict.update({
+                            "type": f"{option_info['option_type']}UT",  # CALL or PUT
+                            "strike": option_info['strike'],
+                            "expiration": option_info['expiration'].isoformat(),
+                            "underlying": option_info['underlying']
+                        })
+                
+                position_data.append(position_dict)
+            
+            self._logger.info(f"✅ Retrieved {len(position_data)} positions from Alpaca")
+            return position_data
+            
+        except Exception as e:
+            self._logger.error(f"❌ Error fetching positions from Alpaca: {e}")
+            return []
+    
+    async def get_account_info(self) -> Dict[str, Any]:
+        """Get account information from Alpaca."""
+        if not self.client:
+            self._logger.error("❌ Alpaca client not initialized")
+            return {}
+        
+        try:
+            account = self.client.get_account()
+            
+            return {
+                "account_id": account.id,
+                "account_balance": float(account.equity),
+                "cash": float(account.cash),
+                "buying_power": float(account.buying_power),
+                "account_status": account.status,
+                "total_pnl": float(account.unrealized_pl) if account.unrealized_pl else 0.0,
+                "day_trade_count": account.daytrade_count,
+                "pattern_day_trader": account.pattern_day_trader,
+                "trade_suspended_by_user": account.trade_suspended_by_user,
+                "trading_blocked": account.trading_blocked,
+                "transfers_blocked": account.transfers_blocked,
+                "account_blocked": account.account_blocked,
+                "created_at": account.created_at.isoformat() if account.created_at else None,
+                "last_updated": datetime.now(timezone.utc).isoformat()
+            }
+            
+        except Exception as e:
+            self._logger.error(f"❌ Error fetching account info from Alpaca: {e}")
+            return {}

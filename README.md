@@ -132,6 +132,70 @@
     }
   }
 
+  🧪 Strategy Sandbox System
+
+  **The Strategy Sandbox provides a complete environment for customizing, testing, and deploying trading strategies:**
+
+  Workflow Overview
+  1. **Base Strategies**: 13 pre-configured strategies loaded from `/backend/config/strategies/development/`
+  2. **Create Custom Config**: Select any base strategy to create a customizable sandbox configuration
+  3. **Parameter Tweaking**: Modify DTE ranges, universes, risk parameters, position sizing, etc.
+  4. **Testing**: Run tests with custom parameters using sandbox API
+  5. **Deployment**: Move successful configurations to live trading
+
+  API Endpoints
+  ```bash
+  # List available base strategies
+  GET /api/strategies/
+
+  # List user's sandbox configurations  
+  GET /api/sandbox/strategies/
+
+  # Create new sandbox configuration
+  POST /api/sandbox/strategies/
+  {
+    "strategy_id": "ThetaCropWeekly",
+    "name": "My Custom ThetaCrop",
+    "config_data": {
+      "universe": {"universe_name": "thetacrop"},
+      "trading": {"target_dte_range": [14, 21], "max_positions": 5},
+      "risk": {"profit_target": 0.5, "loss_limit": -2.0}
+    }
+  }
+
+  # Test sandbox configuration
+  POST /api/sandbox/test/run/{config_id}
+  {
+    "max_opportunities": 10,
+    "use_cached_data": true
+  }
+  ```
+
+  Frontend Integration
+  - **Strategies Tab**: Complete UI for sandbox workflow
+  - **Base Strategy Selection**: Grid view of 13 available strategies
+  - **Parameter Editing**: Dynamic forms for all strategy parameters
+  - **Test Results**: Performance metrics and opportunity analysis
+  - **AI Assistant**: Strategy optimization recommendations
+
+  🚀 Deployment to Live Trading
+  Custom sandbox strategies can be deployed to live trading through:
+  ```bash
+  # CLI Deployment Tool (Recommended)
+  cd backend/scripts/
+  python deploy_strategy.py promote "My Custom Strategy" --from sandbox --to production
+  python deploy_strategy.py set-env production
+  
+  # Verification
+  curl http://localhost:8000/api/sandbox/deploy/status/{config_id}
+  ```
+  
+  Deployment includes:
+  - **Automatic validation** and conservative production limits
+  - **Backup system** with rollback capability
+  - **Environment isolation** (sandbox → production)
+  - **Live trading integration** with real opportunity generation
+
   External Strategy Configuration (JSON-Based)
 
   # config/strategies/rules/ThetaCropWeekly.json

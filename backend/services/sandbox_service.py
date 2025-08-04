@@ -214,10 +214,27 @@ class SandboxTestEngine:
             # Use new strategy-specific scanner instead of live strategy registry
             strategy_scanner = get_strategy_specific_scanner()
             
-            # Map sandbox config to strategy type
+            # Map sandbox config to strategy type by looking up base strategy configuration
             strategy_config_data = config.config_data
-            strategy_info = strategy_config_data.get('strategy', {})
-            strategy_type = strategy_info.get('id', config.strategy_id.upper())
+            
+            # Get the strategy type by reading from the JSON configuration file
+            try:
+                # Read strategy config directly from file
+                config_file_path = Path(__file__).parent.parent / "config" / "strategies" / "development" / f"{config.strategy_id}.json"
+                if config_file_path.exists():
+                    with open(config_file_path, 'r') as f:
+                        base_config = json.load(f)
+                    strategy_type = base_config.get('strategy_type', config.strategy_id.upper())
+                    logger.info(f"Loaded strategy_type '{strategy_type}' for {config.strategy_id} from config file")
+                else:
+                    # Fallback: try to get from sandbox config or use strategy_id  
+                    strategy_info = strategy_config_data.get('strategy', {})
+                    strategy_type = strategy_info.get('strategy_type', config.strategy_id.upper())
+                    logger.warning(f"Config file not found for {config.strategy_id}, using fallback: {strategy_type}")
+            except Exception as e:
+                # Final fallback
+                logger.warning(f"Could not determine strategy_type for {config.strategy_id}: {e}")
+                strategy_type = config.strategy_id.upper()
             
             # Use strategy-specific scanning
             scan_result = await strategy_scanner.scan_strategy(

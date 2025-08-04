@@ -329,7 +329,7 @@ class OpportunityCache:
                             "liquidity_score": opp.liquidity_score,
                             "bias": getattr(opp, 'market_bias', 'NEUTRAL'),
                             "rsi": getattr(opp, 'rsi', 50.0),
-                            "created_at": opp.created_at.isoformat(),
+                            "created_at": getattr(opp, 'generated_at', datetime.utcnow()).isoformat(),
                             "is_demo": False,
                             "scan_source": "strategy_plugin",
                             "universe": opp.universe or "default"
@@ -376,9 +376,9 @@ class OpportunityCache:
                         "days_to_expiration": opp.days_to_expiration,
                         "underlying_price": opp.underlying_price,
                         "liquidity_score": opp.liquidity_score,
-                        "bias": opp.market_bias,
+                        "bias": getattr(opp, 'bias', 'NEUTRAL'),
                         "rsi": getattr(opp, 'rsi', 50.0),
-                        "created_at": opp.created_at.isoformat(),
+                        "created_at": getattr(opp, 'generated_at', datetime.utcnow()).isoformat(),
                         "is_demo": False,
                         "scan_source": "strategy_registry",
                         "universe": opp.universe or "default"

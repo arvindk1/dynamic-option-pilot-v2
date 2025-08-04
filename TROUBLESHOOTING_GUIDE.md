@@ -10,9 +10,84 @@
 
 ---
 
-## 🚨 Common Issues & Fixes Applied (2025-08-03)
+## 🚨 Common Issues & Fixes Applied (2025-08-04)
 
-### **LATEST**: Zero Opportunities in Trading Tab - MAJOR FIX (COMPLETED)
+### **LATEST**: AI Assistant 429 Rate Limit Error - FIXED (COMPLETED)
+**Issue**: AI Assistant returning "Error code: 429" with message "You excee..." (rate limit exceeded)
+**Root Cause**: OpenAI API rate limiting without proper retry logic and fallback mechanisms
+**Symptoms**:
+- AI Assistant shows "Sorry, I encountered an error" with Error 429
+- Strategy analysis requests timeout or fail
+- No rate limiting protection in `strategy_ai_service.py`
+
+**Fix Applied**: Comprehensive rate limiting system with exponential backoff and model fallback
+```python
+# BEFORE (no rate limiting): Direct API calls that fail on 429 errors
+response = await self.client.chat.completions.create(model=self.current_model, ...)
+
+# AFTER (robust rate limiting): Smart retry with fallback models
+response = await self._make_openai_request_with_retry(messages)
+# - Tracks requests per minute/day
+# - Exponential backoff on rate limits
+# - Falls back to cheaper models (gpt-3.5-turbo)
+# - Intelligent waiting for rate limit reset
+```
+
+**Rate Limiting Features**:
+- ✅ **Per-minute tracking**: 60 requests/minute (configurable via `AI_COACH_RATE_LIMIT`)
+- ✅ **Daily limits**: 1000 requests/day to prevent API bill surprises
+- ✅ **Exponential backoff**: 1s, 2s, 4s, 8s delays on rate limit hits
+- ✅ **Model fallback**: Switches to gpt-3.5-turbo when gpt-4o-mini hits limits
+- ✅ **Smart waiting**: Waits up to 65 seconds for rate limit reset
+- ✅ **Usage monitoring**: Track API usage via `/api/sandbox/debug/ai-rate-limits`
+
+**Debug Commands**:
+```bash
+# Check AI service status
+curl http://localhost:8000/api/sandbox/debug/ai-service
+
+# Monitor rate limit status  
+curl http://localhost:8000/api/sandbox/debug/ai-rate-limits
+
+# Test AI analysis (now works with retry logic)
+curl -X POST http://localhost:8000/api/sandbox/ai/analyze/CONFIG_ID
+```
+
+**Environment Configuration**:
+```bash
+# In backend/.env
+AI_COACH_RATE_LIMIT=60        # Requests per minute
+OPENAI_MODEL=gpt-4o-mini      # Default model (most cost-effective)
+OPENAI_API_KEY=sk-proj-...    # Your OpenAI API key
+```
+
+### Strategy Sandbox Frontend Fix - MAJOR FIX (COMPLETED)
+**Issue**: Strategies tab showing "0 strategies" and "No strategies yet" despite backend having 13 loaded strategies
+**Root Cause**: Frontend was fetching from `/api/sandbox/strategies/` (user configs) instead of implementing proper Strategy Sandbox workflow
+**Symptoms**:
+- Strategies tab shows empty state with "0 strategies"
+- Backend API `/api/strategies/` returns 13 strategies correctly
+- Sandbox API `/api/sandbox/strategies/` returns `[]` (empty, as expected for new users)
+
+**Fix Applied**: Complete StrategiesTab redesign to implement proper Strategy Sandbox workflow
+```typescript
+// BEFORE (incorrect): Trying to show sandbox configs as base strategies
+const response = await fetch('/api/sandbox/strategies/');  // Always empty for new users
+
+// AFTER (correct): Implement full Strategy Sandbox workflow
+const baseStrategies = await fetch('/api/strategies/');     // Load base strategies
+const userConfigs = await fetch('/api/sandbox/strategies/'); // Load user's custom configs
+// Show base strategies for creating new configs, user configs for editing
+```
+
+**Architecture Fix**: 
+- ✅ Load 13 base strategies for selection
+- ✅ Show user's sandbox configurations
+- ✅ Create sandbox configs from base strategies
+- ✅ Allow parameter tweaking and testing
+- ✅ Support deployment to live trading
+
+### Zero Opportunities in Trading Tab - FIXED (COMPLETED)
 **Issue**: Trading tab showing "0 opportunities across 13 strategies" despite backend being healthy
 **Root Cause**: Broken opportunity cache service couldn't access strategy registry, but individual strategy scans worked perfectly
 **Symptoms**: 
@@ -85,6 +160,228 @@ curl -X POST http://localhost:8000/api/strategies/RSICouponStrategy/quick-scan
 **Files Modified**:
 - `backend/main.py`: Added 2 new scan endpoints with timeout protection
 - Used existing JSON strategy configurations (no new config files needed)
+
+---
+
+## 🧪 Strategy Sandbox Debugging Guide
+
+### Troubleshooting Strategy Sandbox Issues
+
+#### Issue: "0 strategies" or "No strategies yet" in Strategies Tab
+**Diagnosis Steps**:
+```bash
+1. # Check if base strategies are loaded
+   curl http://localhost:8000/api/strategies/ | python3 -c "
+   import json,sys; data=json.load(sys.stdin); 
+   print(f'Base strategies loaded: {len(data[\"strategies\"])}')"
+
+2. # Check user's sandbox configurations
+   curl http://localhost:8000/api/sandbox/strategies/ | python3 -c "
+   import json,sys; data=json.load(sys.stdin); 
+   print(f'User sandbox configs: {len(data)}')"
+
+3. # Check browser console for API errors
+   # Open DevTools → Console → Look for 404/500 errors
+
+4. # Verify strategy config files exist
+   ls -la backend/config/strategies/development/
+```
+
+**Expected Results**:
+- Base strategies: 13 strategies (ThetaCropWeekly, IronCondor, etc.)
+- User configs: 0+ configurations (depends on user activity)
+- No 404 errors in browser console
+- 13 JSON files in development directory
+
+#### Issue: Cannot create sandbox strategies
+**Diagnosis Steps**:
+```bash
+1. # Test manual creation
+   curl -X POST http://localhost:8000/api/sandbox/strategies/ \
+     -H "Content-Type: application/json" \
+     -d '{"strategy_id": "ThetaCropWeekly", "name": "Test Strategy", "config_data": {"universe": {"universe_name": "thetacrop"}}}'
+
+2. # Check database connection
+   curl http://localhost:8000/health
+
+3. # Verify strategy_id is valid
+   curl http://localhost:8000/api/strategies/ | grep -o '"id":"[^"]*"'
+```
+
+**Expected Results**:
+- Creation returns JSON with ID, strategy_id, config_data
+- Health check shows database connectivity
+- Valid strategy IDs match those in development configs
+
+#### Issue: Sandbox tests failing
+**Diagnosis Steps**:
+```bash
+1. # Test with existing config ID
+   CONFIG_ID=$(curl -s http://localhost:8000/api/sandbox/strategies/ | python3 -c "
+   import json,sys; data=json.load(sys.stdin); 
+   print(data[0]['id'] if data else 'NO_CONFIGS')")
+   
+   curl -X POST http://localhost:8000/api/sandbox/test/run/$CONFIG_ID \
+     -H "Content-Type: application/json" \
+     -d '{"max_opportunities": 3, "use_cached_data": true}'
+
+2. # Check individual strategy scan works
+   curl -X POST http://localhost:8000/api/strategies/ThetaCropWeekly/quick-scan
+
+3. # Verify strategy configuration is valid
+   curl http://localhost:8000/api/sandbox/strategies/$CONFIG_ID
+```
+
+**Expected Results**:
+- Test returns opportunities with performance_metrics
+- Individual scans work (proves base strategy is functional)
+- Configuration shows proper config_data structure
+
+### Strategy Sandbox API Reference
+```bash
+# Complete Strategy Sandbox workflow testing
+# 1. List available base strategies
+curl http://localhost:8000/api/strategies/
+
+# 2. Create sandbox configuration  
+curl -X POST http://localhost:8000/api/sandbox/strategies/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "strategy_id": "ThetaCropWeekly",
+    "name": "My Custom ThetaCrop",
+    "config_data": {
+      "universe": {"universe_name": "thetacrop"},
+      "trading": {"target_dte_range": [14, 21], "max_positions": 5},
+      "risk": {"profit_target": 0.5, "loss_limit": -2.0}
+    }
+  }'
+
+# 3. List user's configurations
+curl http://localhost:8000/api/sandbox/strategies/
+
+# 4. Test configuration
+curl -X POST http://localhost:8000/api/sandbox/test/run/{config_id} \
+  -H "Content-Type: application/json" \
+  -d '{"max_opportunities": 10, "use_cached_data": true}'
+
+# 5. Get parameter template (for advanced users)
+curl http://localhost:8000/api/sandbox/strategies/{strategy_id}/template
+```
+
+---
+
+## 🚀 Strategy Deployment Troubleshooting
+
+### Issue: Cannot deploy sandbox strategy to live trading
+
+**Diagnosis Steps**:
+```bash
+1. # Check if sandbox strategy exists and is ready
+   curl http://localhost:8000/api/sandbox/strategies/ | grep "My Strategy Name"
+
+2. # Validate strategy configuration
+   cd backend/scripts/
+   python deploy_strategy.py list --environment sandbox
+
+3. # Test CLI deployment tool
+   python deploy_strategy.py promote "Strategy Name" --from sandbox --to production
+
+4. # Check deployment status
+   curl http://localhost:8000/api/sandbox/deploy/status/{config_id}
+```
+
+**Expected Results**:
+- Strategy appears in sandbox list
+- CLI tool validates and promotes without errors
+- Deployment status shows `"is_active": true`
+
+### Issue: Deployment validation fails
+
+**Common Validation Errors**:
+```bash
+# Missing required fields
+"Missing required fields: ['universe', 'position_parameters']"
+
+# Universe file not found  
+"Universe file not found: /path/to/universe.json"
+
+# Invalid JSON configuration
+"Invalid JSON: Expecting ',' delimiter"
+```
+
+**Fix Steps**:
+```bash
+1. # Check strategy configuration structure
+   curl http://localhost:8000/api/sandbox/strategies/{config_id}
+
+2. # Validate universe file exists
+   ls -la backend/universe_lists/thetacrop.json
+
+3. # Test JSON validity
+   python -m json.tool backend/config/strategies/production/MyStrategy.json
+```
+
+### Issue: Deployed strategy not appearing in Trading tab
+
+**Diagnosis Steps**:
+```bash
+1. # Verify deployment environment is set
+   grep TRADING_ENVIRONMENT backend/.env
+
+2. # Check if production strategies are loaded
+   curl http://localhost:8000/api/strategies/ | grep "My Strategy"
+
+3. # Restart backend to reload strategies
+   kill $(pgrep -f "python.*main.py")
+   python backend/main.py
+
+4. # Check strategy is generating opportunities
+   curl http://localhost:8000/api/trading/opportunities | grep "My Strategy"
+```
+
+**Expected Results**:
+- Environment set to `TRADING_ENVIRONMENT=PRODUCTION`
+- Strategy appears in `/api/strategies/` list
+- Strategy generates opportunities in Trading tab
+
+### Deployment CLI Tool Reference
+```bash
+# List strategies in all environments
+python backend/scripts/deploy_strategy.py list
+
+# List specific environment
+python backend/scripts/deploy_strategy.py list --environment sandbox
+python backend/scripts/deploy_strategy.py list --environment production
+
+# Promote strategy (with automatic validation and backup)
+python backend/scripts/deploy_strategy.py promote "Strategy Name" \
+  --from sandbox --to production
+
+# Set active trading environment
+python backend/scripts/deploy_strategy.py set-env production
+python backend/scripts/deploy_strategy.py set-env development
+
+# Check what strategies exist before promotion
+ls -la backend/config/strategies/sandbox/
+ls -la backend/config/strategies/production/
+```
+
+### Rollback Procedures
+```bash  
+# If deployment causes issues, rollback steps:
+1. # Check backup directory
+   ls -la backend/config/backups/
+
+2. # Restore from backup (find latest timestamp)
+   cp backend/config/backups/MyStrategy_production_20250803_143022.json \
+      backend/config/strategies/production/MyStrategy.json
+
+3. # Set environment back to development
+   python backend/scripts/deploy_strategy.py set-env development
+
+4. # Restart backend
+   python backend/main.py
+```
 
 **Testing Commands**:
 ```bash

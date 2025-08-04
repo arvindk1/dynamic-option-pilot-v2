@@ -950,6 +950,17 @@ async def reinitialize_ai_service():
         return {"error": str(e)}
 
 
+@router.get("/debug/ai-rate-limits")
+async def get_ai_rate_limit_status():
+    """Get current AI service rate limit status"""
+    try:
+        ai_service = get_strategy_ai_service()
+        status = ai_service.get_rate_limit_status()
+        return status
+    except Exception as e:
+        return {"error": str(e), "status": "unavailable"}
+
+
 # Strategy Parameter Template Endpoints
 @router.get("/strategies/available", response_model=StrategyListResponse)
 async def get_available_strategies():
