@@ -1,11 +1,13 @@
 """Database configuration and base models."""
 
 import logging
-from sqlalchemy import create_engine, MetaData
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, Session
-from sqlalchemy.pool import StaticPool
 from typing import Generator
+
+from sqlalchemy import MetaData, create_engine
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.pool import StaticPool
+
 from config.settings import get_settings
 
 logger = logging.getLogger(__name__)
@@ -54,10 +56,13 @@ def create_tables():
         # Import all models to ensure they're registered with Base
         from models.opportunity import OpportunitySnapshot, ScanSession
         from models.sandbox import (
-            SandboxStrategyConfig, SandboxTestRun, SandboxAIConversation, 
-            SandboxHistoricalCache, SandboxStats
+            SandboxAIConversation,
+            SandboxHistoricalCache,
+            SandboxStats,
+            SandboxStrategyConfig,
+            SandboxTestRun,
         )
-        
+
         Base.metadata.create_all(bind=engine)
         logger.info("Database tables created successfully")
     except Exception as e:

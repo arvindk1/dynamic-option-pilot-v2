@@ -3,7 +3,7 @@ Unit tests for individual components and functions.
 
 Test Structure:
 - test_models/ - Database model tests
-- test_services/ - Business logic tests  
+- test_services/ - Business logic tests
 - test_api/ - API endpoint tests
 - test_utils/ - Utility function tests
 - test_plugins/ - Plugin system tests

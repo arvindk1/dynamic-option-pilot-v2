@@ -3,18 +3,21 @@ Database migration to add error logging tables
 Run this to create the critical error logging tables
 """
 
-import sys
 import os
+import sys
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sqlalchemy import create_engine, text
+
 from config.settings import get_settings
+
 
 def run_migration():
     """Create error logging tables"""
     settings = get_settings()
     engine = create_engine(settings.database.url)
-    
+
     # Create critical error logs table
     critical_error_logs_sql = """
     CREATE TABLE IF NOT EXISTS critical_error_logs (
@@ -34,7 +37,7 @@ def run_migration():
     CREATE INDEX IF NOT EXISTS idx_critical_error_logs_created_at ON critical_error_logs(created_at);
     CREATE INDEX IF NOT EXISTS idx_critical_error_logs_resolved_at ON critical_error_logs(resolved_at);
     """
-    
+
     # Create system health status table
     system_health_sql = """
     CREATE TABLE IF NOT EXISTS system_health_status (
@@ -50,7 +53,7 @@ def run_migration():
     CREATE INDEX IF NOT EXISTS idx_system_health_service_name ON system_health_status(service_name);
     CREATE INDEX IF NOT EXISTS idx_system_health_check_timestamp ON system_health_status(check_timestamp);
     """
-    
+
     try:
         with engine.connect() as conn:
             # Execute statements one at a time for SQLite
@@ -80,18 +83,19 @@ def run_migration():
                     details TEXT
                 )""",
                 "CREATE INDEX IF NOT EXISTS idx_system_health_service_name ON system_health_status(service_name)",
-                "CREATE INDEX IF NOT EXISTS idx_system_health_check_timestamp ON system_health_status(check_timestamp)"
+                "CREATE INDEX IF NOT EXISTS idx_system_health_check_timestamp ON system_health_status(check_timestamp)",
             ]
-            
+
             for statement in statements:
                 conn.execute(text(statement))
-            
+
             conn.commit()
-            
+
         print("✅ Error logging tables created successfully")
-        
+
     except Exception as e:
         print(f"❌ Error creating tables: {e}")
+
 
 if __name__ == "__main__":
     run_migration()

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -31,17 +31,12 @@ import {
 import { useTheme } from '@/contexts/ThemeContext';
 import { useRealTimeData } from '@/hooks/useRealTimeData';
 import { RealTimeChart } from '@/components/RealTimeChart';
-import { SpreadExecutor } from '@/components/SpreadExecutor';
-import { EnhancedTradeExecutor } from '@/components/EnhancedTradeExecutor';
-import { DynamicStrategyTabs } from '@/components/DynamicStrategyTabs';
+import { LiveOpportunitiesTab } from '@/components/LiveOpportunitiesTab';
 import { WebSocketStatus } from '@/components/WebSocketStatus';
 import { TradingTour, TourTrigger } from '@/components/TradingTour';
 import MarketStatusWidget from '@/components/MarketStatusWidget';
-// MarketCommentary is imported via LazyTabContent for better performance
 import { DemoDataService } from '@/services/demoData';
 import SystemStatus from '@/components/SystemStatus';
-import DemoModeAlert from '@/components/DemoModeAlert';
-import { dataThrottleService } from '@/services/dataThrottle';
 import { 
   LazyTabContent,
   LazySentimentDashboard,
@@ -58,172 +53,47 @@ import { tabPerformanceService } from '@/services/tabPerformance';
 import TradingErrorBoundary from '@/components/TradingErrorBoundary';
 import { useKeyboardNavigation } from '@/hooks/useKeyboardNavigation';
 import { useAccessibility } from '@/components/AccessibilityProvider';
-import { TradingCardSkeleton, DashboardLoadingState } from '@/components/LoadingStates';
 import { TieredNavigation } from '@/components/TieredNavigation';
 import { HelpMenu } from '@/components/HelpMenu';
-import { StrategiesTab } from '@/components/StrategiesTab';
-
-interface TradingConfig {
-  brokerPlugin: string;
-  paperTrading: boolean;
-  symbol: string;
-  dteMin: number;
-  dteMax: number;
-  deltaTarget: number;
-  creditThreshold: number;
-  maxSpreadWidth: number;
-  maxPositions: number;
-  positionSizePct: number;
-  maxMarginUsage: number;
-  maxDrawdown: number;
-  kellyFraction: number;
-}
-
-interface AccountMetrics {
-  account_balance: number;
-  cash: number;
-  buying_power: number;
-  account_status: string;
-  margin_used: number;
-  total_pnl: number;
-  win_rate: number;
-  total_trades: number;
-  positions_open: number;
-  max_drawdown: number;
-  sharpe_ratio: number;
-  vix: number;
-  iv_rank: number;
-  options_level: string;
-  data_state?: string;
-  warning?: string;
-  demo_notice?: string;
-  is_demo?: boolean;
-  last_updated?: string;
-}
-
-interface ApiOpportunity {
-  id: string;
-  symbol: string;
-  short_strike?: number;
-  long_strike?: number;
-  strike?: number;
-  premium: number;
-  max_loss: number;
-  delta: number;
-  probability_profit: number;
-  expected_value: number;
-  days_to_expiration: number;
-  underlying_price: number;
-  liquidity_score: number;
-  bias: string;
-  rsi: number;
-}
-
-interface SpreadCandidate {
-  id: string;
-  symbol?: string;
-  shortStrike: number;
-  longStrike: number;
-  credit: number;
-  maxLoss: number;
-  delta: number;
-  probabilityProfit: number;
-  expectedValue: number;
-  daysToExpiration: number;
-  type: 'PUT' | 'CALL';
-  underlyingPrice?: number;
-  liquidityScore?: number;
-  bias?: string;
-  rsi?: number;
-}
-
-interface EnhancedTradeOpportunity {
-  id: string;
-  symbol: string;
-  strategy_type: string;
-  option_type?: string;
-  strike?: number;
-  short_strike?: number;
-  long_strike?: number;
-  expiration: string;
-  days_to_expiration: number;
-  premium: number;
-  max_loss: number;
-  max_profit: number;
-  probability_profit: number;
-  expected_value: number;
-  delta: number;
-  gamma?: number;
-  theta?: number;
-  vega?: number;
-  implied_volatility?: number;
-  volume?: number;
-  open_interest?: number;
-  liquidity_score: number;
-  underlying_price: number;
-  bias: string;
-  rsi: number;
-  macd_signal?: string;
-  support_resistance?: { support: number; resistance: number };
-  trade_setup: string;
-  risk_level: string;
-}
-
-interface EnhancedTradeCategories {
-  high_probability: EnhancedTradeOpportunity[];
-  quick_scalps: EnhancedTradeOpportunity[];
-  swing_trades: EnhancedTradeOpportunity[];
-  volatility_plays: EnhancedTradeOpportunity[];
-  thetacrop: EnhancedTradeOpportunity[];
-}
-
-interface RiskMetrics {
-  portfolio_metrics: {
-    total_delta: number;
-    total_theta: number;
-    total_vega: number;
-    total_gamma: number;
-  };
-  var_95: number;
-  expected_shortfall: number;
-  correlation_spy: number;
-}
+import { StrategySandboxTab } from '@/components/StrategySandboxTab';
+import { useAccountMetrics } from '@/hooks/useAccountMetrics';
+import { useTradingOpportunities } from '@/hooks/useTradingOpportunities';
+import { useTradingConfig } from '@/hooks/useTradingConfig';
 
 const TradingDashboard = React.memo(() => {
   const { theme, toggleTheme } = useTheme();
   const { announceToScreenReader } = useAccessibility();
   
-  // Demo mode and tour state
-  const [isDemoMode, setIsDemoMode] = useState(false); // Default to false, will be determined async
+  const [isDemoMode, setIsDemoMode] = useState(false);
   const [demoModeInitialized, setDemoModeInitialized] = useState(false);
   const [showTour, setShowTour] = useState(false);
   const [isFirstVisit, setIsFirstVisit] = useState(DemoDataService.isFirstVisit());
   
-  // Tab management state
+  const { accountMetrics, loadAccountMetrics } = useAccountMetrics(isDemoMode, demoModeInitialized);
+  const {
+    dataSourceInfo,
+    loadTradingOpportunities,
+  } = useTradingOpportunities(isDemoMode, demoModeInitialized);
+  const { config, setConfig } = useTradingConfig();
+
   const [activeTab, setActiveTab] = useState("overview");
   const [preloadedTabs, setPreloadedTabs] = useState<Set<string>>(new Set());
   
-  // Enhanced tab navigation with accessibility and performance tracking
   const handleTabChange = useCallback((tabName: string) => {
-    // Measure tab switch performance
     tabPerformanceService.measureTabSwitch(tabName);
-    
     setActiveTab(tabName);
     announceToScreenReader(`Switched to ${tabName} tab`);
   }, [announceToScreenReader]);
   
-  // Setup tab preloading
-  const { markTabAsPreloaded, isTabPreloaded } = useTabPreload({
+  useTabPreload({
     currentTab: activeTab,
     onPreload: (tabName: string) => {
       setPreloadedTabs(prev => new Set([...prev, tabName]));
-      // Preload resources for the tab
       tabPerformanceService.preloadTabResources(tabName);
     },
-    preloadDelay: 500 // Reduced from 800ms to 500ms for faster preloading
+    preloadDelay: 500
   });
-  
-  // Keyboard navigation
+
   const { showHelp } = useKeyboardNavigation({
     onNavigateToTab: handleTabChange,
     onToggleTheme: toggleTheme,
@@ -236,229 +106,25 @@ const TradingDashboard = React.memo(() => {
     onOpenHelp: () => showHelp(),
   });
   
-  // Move all hooks to top level (React rules compliance)
   const { 
     marketData, 
     performanceData, 
-    accountValue, 
     isMarketOpen, 
     addPerformancePoint,
-    signals,
-    connectionStatus,
-    usingWebSocket,
-    wsConnected
   } = useRealTimeData();
 
-  // Enhanced trade execution callback that links to position tracking
   const handleTradeExecuted = useCallback((pnl: number) => {
-    // Add performance data point
     addPerformancePoint(pnl);
-    
-    // Auto-switch to positions tab to show the new trade
     setTimeout(() => {
       setActiveTab('positions');
-      // Announce to screen reader
       announceToScreenReader("Trade executed successfully. Switched to Positions tab to view trade.");
-    }, 1000); // Small delay to allow execution to complete
+    }, 1000);
   }, [addPerformancePoint, announceToScreenReader]);
-  
-  const [accountMetrics, setAccountMetrics] = useState<AccountMetrics>({
-    account_balance: 0,
-    cash: 0,
-    buying_power: 0,
-    account_status: 'LOADING',
-    margin_used: 0,
-    total_pnl: 0,
-    win_rate: 0,
-    total_trades: 0,
-    positions_open: 0,
-    max_drawdown: 0,
-    sharpe_ratio: 0,
-    vix: 0,
-    iv_rank: 0,
-    options_level: 'Unknown'
-  });
-
-  const [riskMetrics, setRiskMetrics] = useState<RiskMetrics | null>(null);
-  
-  const [config, setConfig] = useState<TradingConfig>({
-    brokerPlugin: 'alpaca',
-    paperTrading: true,
-    symbol: 'SPX', // Using SPX for S&P 500 index tracking
-    dteMin: 30,
-    dteMax: 45,
-    deltaTarget: 0.10,
-    creditThreshold: 0.50,
-    maxSpreadWidth: 50,
-    maxPositions: 5,
-    positionSizePct: 0.02,
-    maxMarginUsage: 0.50,
-    maxDrawdown: 0.15,
-    kellyFraction: 0.25
-  });
 
   const [marketBias, setMarketBias] = useState<'BULLISH' | 'NEUTRAL' | 'BEARISH'>('NEUTRAL');
   const [confidence, setConfidence] = useState(0.72);
   const [volatilityRegime, setVolatilityRegime] = useState<'HIGH_VOL' | 'NORMAL_VOL' | 'LOW_VOL'>('NORMAL_VOL');
 
-  // Load real account metrics
-  const loadAccountMetrics = useCallback(async () => {
-    try {
-      // Use demo data when in demo mode
-      const endpoint = isDemoMode ? '/api/demo/account/metrics' : '/api/dashboard/metrics';
-      
-      // Use throttled data service to prevent excessive calls
-      const metrics = await dataThrottleService.getData(
-        `account-metrics-${isDemoMode}`,
-        async () => {
-          const response = await fetch(endpoint);
-          if (response.ok) {
-            return await response.json();
-          }
-          throw new Error('Failed to fetch account metrics');
-        },
-        180000 // Cache for 3 minutes
-      );
-      
-      if (metrics) {
-        setAccountMetrics({
-          account_balance: metrics.account_balance || 0,
-          cash: metrics.cash || 0,
-          buying_power: metrics.buying_power || 0,
-          account_status: metrics.account_status || 'UNKNOWN',
-          margin_used: metrics.margin_used || 0,
-          total_pnl: metrics.total_pnl || 0,
-          win_rate: metrics.win_rate || 0,
-          total_trades: metrics.total_trades || 0,
-          positions_open: metrics.positions_open || 0,
-          max_drawdown: metrics.max_drawdown || 0,
-          sharpe_ratio: metrics.sharpe_ratio || 0,
-          options_level: metrics.options_level || 'Level 1',
-          vix: metrics.vix || 18.5, // Default VIX value
-          iv_rank: metrics.iv_rank || 45, // Default IV rank
-          
-          // Pass through data state indicators for demo mode detection
-          data_state: metrics.data_state,
-          warning: metrics.warning,
-          demo_notice: metrics.demo_notice,
-          is_demo: metrics.is_demo,
-          last_updated: metrics.last_updated
-        });
-      }
-    } catch (error) {
-      console.error('Failed to load account metrics:', error);
-    }
-  }, [isDemoMode]);
-
-  // Load advanced risk metrics
-  const loadRiskMetrics = useCallback(async () => {
-    try {
-      // For v2.0, use mock risk metrics until analytics endpoint is implemented
-      const response = { ok: false }; // await fetch('http://localhost:8000/api/analytics/risk-metrics');
-      if (response.ok) {
-        const metrics = await response.json();
-        setRiskMetrics(metrics);
-      }
-    } catch (error) {
-      console.error('Failed to load risk metrics:', error);
-    }
-  }, []);
-
-  // Real spread candidates from backend API
-  const [spreadCandidates, setSpreadCandidates] = useState<SpreadCandidate[]>([]);
-  const [enhancedOpportunities, setEnhancedOpportunities] = useState<EnhancedTradeOpportunity[]>([]);
-  const [tradeCategories, setTradeCategories] = useState<EnhancedTradeCategories>({
-    high_probability: [],
-    quick_scalps: [],
-    swing_trades: [],
-    volatility_plays: [],
-    thetacrop: []
-  });
-  const [loadingOpportunities, setLoadingOpportunities] = useState(false);
-  const [dataSourceInfo, setDataSourceInfo] = useState<{
-    underlying_data: string;
-    options_pricing: string;
-    expiration_dates: string;
-    disclaimer: string;
-  } | null>(null);
-  const [scanMethodology, setScanMethodology] = useState<{
-    universe: string[];
-    symbols_scanned: number;
-    total_symbols: number;
-    strategies: string[];
-    filters: Record<string, string>;
-    expiration_range: string;
-    refresh_rate: string;
-  } | null>(null);
-
-  // Load real trading opportunities from backend
-  const loadTradingOpportunities = useCallback(async () => {
-    setLoadingOpportunities(true);
-    try {
-      // Use demo data when in demo mode
-      const endpoint = isDemoMode ? '/api/demo/opportunities' : '/api/trading/opportunities';
-      
-      // Use throttled data service to prevent excessive calls
-      const data = await dataThrottleService.getData(
-        `trading-opportunities-${isDemoMode}`,
-        async () => {
-          const response = await fetch(endpoint);
-          if (response.ok) {
-            return await response.json();
-          }
-          throw new Error('Failed to fetch trading opportunities');
-        },
-        240000 // Cache for 4 minutes
-      );
-      
-      if (data) {
-        
-        // Set enhanced opportunities
-        setEnhancedOpportunities(data.opportunities || []);
-        
-        // Set categorized opportunities
-        if (data.categories) {
-          setTradeCategories(data.categories);
-        }
-
-        // Capture data source and scan methodology info
-        if (data.data_source_info) {
-          setDataSourceInfo(data.data_source_info);
-        }
-        if (data.scan_methodology) {
-          setScanMethodology(data.scan_methodology);
-        }
-        
-        // Legacy format for backward compatibility (memoized for performance)
-        const rawOpportunities = data.opportunities || [];
-        const candidates = rawOpportunities.map((opp: ApiOpportunity) => ({
-          id: opp.id,
-          symbol: opp.symbol,
-          shortStrike: opp.short_strike || opp.strike,
-          longStrike: opp.long_strike || (opp.strike - 5),
-          credit: opp.premium,
-          maxLoss: opp.max_loss * 100,
-          delta: opp.delta,
-          probabilityProfit: opp.probability_profit,
-          expectedValue: opp.expected_value * 100,
-          daysToExpiration: opp.days_to_expiration,
-          underlyingPrice: opp.underlying_price,
-          liquidityScore: opp.liquidity_score,
-          bias: opp.bias,
-          rsi: opp.rsi
-        }));
-        setSpreadCandidates(candidates);
-      }
-    } catch (error) {
-      console.error('Failed to load trading opportunities:', error);
-      // Fallback to empty array
-      setSpreadCandidates([]);
-    } finally {
-      setLoadingOpportunities(false);
-    }
-  }, [isDemoMode]);
-
-  // Demo mode and tour handlers
   const handleDemoModeToggle = useCallback((enabled: boolean) => {
     setIsDemoMode(enabled);
     if (enabled) {
@@ -466,7 +132,6 @@ const TradingDashboard = React.memo(() => {
     } else {
       DemoDataService.disableDemoMode();
     }
-    // Reload data when switching modes
     loadAccountMetrics();
     loadTradingOpportunities();
   }, [loadAccountMetrics, loadTradingOpportunities]);
@@ -485,7 +150,6 @@ const TradingDashboard = React.memo(() => {
     setShowTour(false);
   }, []);
 
-  // Initialize demo mode based on account balance and user status
   useEffect(() => {
     const initializeDemoMode = async () => {
       try {
@@ -496,7 +160,6 @@ const TradingDashboard = React.memo(() => {
         }
       } catch (error) {
         console.error('Failed to initialize demo mode:', error);
-        // Fallback to current localStorage value or false
         setIsDemoMode(DemoDataService.isDemoMode());
       }
       setDemoModeInitialized(true);
@@ -505,10 +168,8 @@ const TradingDashboard = React.memo(() => {
     initializeDemoMode();
   }, []);
 
-  // Auto-start tour for first-time visitors (only after demo mode is initialized)
   useEffect(() => {
     if (demoModeInitialized && isFirstVisit && DemoDataService.shouldShowTour()) {
-      // If demo mode is enabled for first-time users, start tour after a short delay
       if (isDemoMode) {
         const timer = setTimeout(() => {
           setShowTour(true);
@@ -518,24 +179,6 @@ const TradingDashboard = React.memo(() => {
       }
     }
   }, [isFirstVisit, isDemoMode, demoModeInitialized]);
-  
-  useEffect(() => {
-    // Only start loading data after demo mode has been initialized
-    if (demoModeInitialized) {
-      loadAccountMetrics();
-      loadRiskMetrics();
-      loadTradingOpportunities();
-      const interval = setInterval(() => {
-        loadAccountMetrics();
-        loadRiskMetrics();
-      }, 300000); // Update every 5 minutes (reduced from 60 seconds)
-      const opportunitiesInterval = setInterval(loadTradingOpportunities, 300000); // Update every 5 minutes (reduced from 2 minutes)
-      return () => {
-        clearInterval(interval);
-        clearInterval(opportunitiesInterval);
-      };
-    }
-  }, [demoModeInitialized, loadAccountMetrics, loadRiskMetrics, loadTradingOpportunities]);
 
   const pluginStatus = [
     { name: 'Data Ingestion', status: 'active', lastUpdate: '2 min ago', plugin: 'alpaca' },
@@ -855,7 +498,7 @@ const TradingDashboard = React.memo(() => {
               preload={preloadedTabs.has("trades")}
               loadOnMount={true}
             >
-              <DynamicStrategyTabs 
+              <LiveOpportunitiesTab
                 onTradeExecuted={handleTradeExecuted}
                 symbol={config.symbol}
               />
@@ -898,7 +541,7 @@ const TradingDashboard = React.memo(() => {
               isActive={activeTab === "strategies"}
               preload={preloadedTabs.has("strategies")}
             >
-              <StrategiesTab />
+              <StrategySandboxTab />
             </LazyTabContent>
           </TabsContent>
 

@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react'
 import { BrowserRouter } from 'react-router-dom'
 import TradingDashboard from '@/components/TradingDashboard'
 import { ThemeProvider } from '@/contexts/ThemeContext'
+import { AccessibilityProvider } from '@/components/AccessibilityProvider'
 
 // Mock the child components that depend on external APIs
 vi.mock('@/components/RealTimeChart', () => ({
@@ -48,7 +49,9 @@ const renderWithProviders = (component: React.ReactElement) => {
   return render(
     <BrowserRouter>
       <ThemeProvider>
-        {component}
+        <AccessibilityProvider>
+          {component}
+        </AccessibilityProvider>
       </ThemeProvider>
     </BrowserRouter>
   )
@@ -70,13 +73,11 @@ describe('TradingDashboard', () => {
   it('renders main dashboard tabs', () => {
     renderWithProviders(<TradingDashboard />)
     
-    expect(screen.getByText('Overview')).toBeInTheDocument()
-    expect(screen.getByText('Sentiment')).toBeInTheDocument()
-    expect(screen.getByText('Signals')).toBeInTheDocument()
-    expect(screen.getByText('Trades')).toBeInTheDocument()
-    expect(screen.getByText('Positions')).toBeInTheDocument()
-    expect(screen.getByText('Risk')).toBeInTheDocument()
-    expect(screen.getByText('Config')).toBeInTheDocument()
+    expect(screen.getByText('Dashboard')).toBeInTheDocument()
+    expect(screen.getByText('Trading')).toBeInTheDocument()
+    expect(screen.getByText('Analytics')).toBeInTheDocument()
+    expect(screen.getByText('Strategies')).toBeInTheDocument()
+    expect(screen.getByText('Tools')).toBeInTheDocument()
   })
 
   it('displays market data when available', () => {
@@ -97,6 +98,6 @@ describe('TradingDashboard', () => {
     renderWithProviders(<TradingDashboard />)
     
     // Component should render even when data is loading
-    expect(screen.getByRole('tablist')).toBeInTheDocument()
+    expect(screen.getAllByRole('tablist').length).toBeGreaterThan(0)
   })
 })
