@@ -300,7 +300,7 @@ const AITradeCoach: React.FC = React.memo(() => {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm text-muted-foreground">Trades Graded</p>
-                      <p className="text-2xl font-bold">{dashboardData.summary.total_trades_graded}</p>
+                      <p className="text-2xl font-bold">{dashboardData.summary?.total_trades_graded || 0}</p>
                     </div>
                     <Award className="h-8 w-8 text-purple-600" />
                   </div>
@@ -312,7 +312,7 @@ const AITradeCoach: React.FC = React.memo(() => {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm text-muted-foreground">Average Score</p>
-                      <p className="text-2xl font-bold">{dashboardData.summary.average_score.toFixed(1)}</p>
+                      <p className="text-2xl font-bold">{dashboardData.summary?.average_score?.toFixed(1) || 'N/A'}</p>
                     </div>
                     <Target className="h-8 w-8 text-blue-600" />
                   </div>
@@ -324,7 +324,7 @@ const AITradeCoach: React.FC = React.memo(() => {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm text-muted-foreground">Active Insights</p>
-                      <p className="text-2xl font-bold">{dashboardData.summary.active_insights}</p>
+                      <p className="text-2xl font-bold">{dashboardData.summary?.active_insights || 0}</p>
                     </div>
                     <Lightbulb className="h-8 w-8 text-yellow-600" />
                   </div>
@@ -336,7 +336,7 @@ const AITradeCoach: React.FC = React.memo(() => {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm text-muted-foreground">Patterns Found</p>
-                      <p className="text-2xl font-bold">{dashboardData.summary.patterns_identified}</p>
+                      <p className="text-2xl font-bold">{dashboardData.summary?.patterns_identified || 0}</p>
                     </div>
                     <BarChart3 className="h-8 w-8 text-green-600" />
                   </div>
@@ -352,7 +352,7 @@ const AITradeCoach: React.FC = React.memo(() => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {dashboardData.recent_grades.slice(0, 5).map((grade) => (
+                  {(dashboardData.recent_grades || []).slice(0, 5).map((grade) => (
                     <div key={grade.id} className="flex items-center justify-between p-3 border rounded-lg">
                       <div className="flex items-center gap-3">
                         <Badge className={getGradeColor(grade.overall_grade)}>
@@ -386,7 +386,7 @@ const AITradeCoach: React.FC = React.memo(() => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {dashboardData.active_insights.slice(0, 3).map((insight) => (
+                  {(dashboardData.active_insights || []).slice(0, 3).map((insight) => (
                     <div key={insight.id} className="flex items-start justify-between p-3 border rounded-lg">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
@@ -419,7 +419,7 @@ const AITradeCoach: React.FC = React.memo(() => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-6">
-                  {dashboardData.recent_grades.map((grade) => (
+                  {(dashboardData.recent_grades || []).map((grade) => (
                     <div key={grade.id} className="border rounded-lg p-4">
                       <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-3">
@@ -436,7 +436,7 @@ const AITradeCoach: React.FC = React.memo(() => {
 
                       {/* Component Scores */}
                       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-4">
-                        {Object.entries(grade.component_scores).map(([component, score]) => (
+                        {Object.entries(grade.component_scores || {}).map(([component, score]) => (
                           <div key={component} className="text-center">
                             <p className="text-sm font-medium capitalize">{component.replace('_', ' ')}</p>
                             <Progress value={score} className="mt-1 mb-1" />
@@ -453,11 +453,11 @@ const AITradeCoach: React.FC = React.memo(() => {
 
                       {/* Strengths and Weaknesses */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                        {grade.strengths.length > 0 && (
+                        {(grade.strengths || []).length > 0 && (
                           <div>
                             <h4 className="font-semibold text-green-600 mb-2">Strengths</h4>
                             <ul className="space-y-1">
-                              {grade.strengths.map((strength, idx) => (
+                              {(grade.strengths || []).map((strength, idx) => (
                                 <li key={idx} className="text-sm flex items-start gap-2">
                                   <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
                                   {strength}
@@ -467,11 +467,11 @@ const AITradeCoach: React.FC = React.memo(() => {
                           </div>
                         )}
 
-                        {grade.weaknesses.length > 0 && (
+                        {(grade.weaknesses || []).length > 0 && (
                           <div>
                             <h4 className="font-semibold text-orange-600 mb-2">Areas for Improvement</h4>
                             <ul className="space-y-1">
-                              {grade.weaknesses.map((weakness, idx) => (
+                              {(grade.weaknesses || []).map((weakness, idx) => (
                                 <li key={idx} className="text-sm flex items-start gap-2">
                                   <AlertTriangle className="h-4 w-4 text-orange-600 mt-0.5 flex-shrink-0" />
                                   {weakness}
@@ -483,11 +483,11 @@ const AITradeCoach: React.FC = React.memo(() => {
                       </div>
 
                       {/* Improvement Suggestions */}
-                      {grade.improvement_suggestions.length > 0 && (
+                      {(grade.improvement_suggestions || []).length > 0 && (
                         <div className="mt-4">
                           <h4 className="font-semibold mb-2">Improvement Suggestions</h4>
                           <ul className="space-y-1">
-                            {grade.improvement_suggestions.map((suggestion, idx) => (
+                            {(grade.improvement_suggestions || []).map((suggestion, idx) => (
                               <li key={idx} className="text-sm flex items-start gap-2">
                                 <BookOpen className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
                                 {suggestion}
@@ -511,7 +511,7 @@ const AITradeCoach: React.FC = React.memo(() => {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {dashboardData.performance_patterns.map((pattern) => (
+                  {(dashboardData.performance_patterns || []).map((pattern) => (
                     <div key={pattern.id} className="border rounded-lg p-4">
                       <div className="flex items-center gap-2 mb-3">
                         <span className="text-lg">{getPatternTypeIcon(pattern.pattern_type)}</span>
@@ -543,11 +543,11 @@ const AITradeCoach: React.FC = React.memo(() => {
                         </span>
                       </div>
 
-                      {pattern.recommendations.length > 0 && (
+                      {(pattern.recommendations || []).length > 0 && (
                         <div>
                           <h4 className="font-semibold text-sm mb-2">Recommendations</h4>
                           <ul className="space-y-1">
-                            {pattern.recommendations.slice(0, 2).map((rec, idx) => (
+                            {(pattern.recommendations || []).slice(0, 2).map((rec, idx) => (
                               <li key={idx} className="text-xs flex items-start gap-2">
                                 <Zap className="h-3 w-3 text-yellow-600 mt-0.5 flex-shrink-0" />
                                 {rec}
@@ -571,7 +571,7 @@ const AITradeCoach: React.FC = React.memo(() => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {dashboardData.active_insights.map((insight) => (
+                  {(dashboardData.active_insights || []).map((insight) => (
                     <div key={insight.id} className="border rounded-lg p-4">
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex items-center gap-2">
@@ -592,11 +592,11 @@ const AITradeCoach: React.FC = React.memo(() => {
                       <h3 className="font-semibold mb-2">{insight.title}</h3>
                       <p className="text-sm text-muted-foreground mb-3">{insight.description}</p>
                       
-                      {insight.actionable_steps.length > 0 && (
+                      {(insight.actionable_steps || []).length > 0 && (
                         <div className="mb-3">
                           <h4 className="font-semibold text-sm mb-2">Action Steps</h4>
                           <ol className="space-y-1">
-                            {insight.actionable_steps.map((step, idx) => (
+                            {(insight.actionable_steps || []).map((step, idx) => (
                               <li key={idx} className="text-sm flex items-start gap-2">
                                 <span className="bg-blue-100 text-blue-600 rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">
                                   {idx + 1}
@@ -637,19 +637,19 @@ const AITradeCoach: React.FC = React.memo(() => {
                         <div className="space-y-2">
                           <div className="flex justify-between">
                             <span>Sharpe Ratio:</span>
-                            <span className="font-mono">{dashboardData.portfolio_optimization.current_metrics.sharpe_ratio.toFixed(2)}</span>
+                            <span className="font-mono">{dashboardData.portfolio_optimization?.current_metrics?.sharpe_ratio?.toFixed(2) || 'N/A'}</span>
                           </div>
                           <div className="flex justify-between">
                             <span>Max Drawdown:</span>
-                            <span className="font-mono">{(dashboardData.portfolio_optimization.current_metrics.max_drawdown * 100).toFixed(1)}%</span>
+                            <span className="font-mono">{((dashboardData.portfolio_optimization?.current_metrics?.max_drawdown || 0) * 100).toFixed(1)}%</span>
                           </div>
                           <div className="flex justify-between">
                             <span>Win Rate:</span>
-                            <span className="font-mono">{(dashboardData.portfolio_optimization.current_metrics.win_rate * 100).toFixed(1)}%</span>
+                            <span className="font-mono">{((dashboardData.portfolio_optimization?.current_metrics?.win_rate || 0) * 100).toFixed(1)}%</span>
                           </div>
                           <div className="flex justify-between">
                             <span>Avg Return:</span>
-                            <span className="font-mono">{(dashboardData.portfolio_optimization.current_metrics.avg_return * 100).toFixed(1)}%</span>
+                            <span className="font-mono">{((dashboardData.portfolio_optimization?.current_metrics?.avg_return || 0) * 100).toFixed(1)}%</span>
                           </div>
                         </div>
                       </div>
@@ -659,19 +659,19 @@ const AITradeCoach: React.FC = React.memo(() => {
                         <div className="space-y-2">
                           <div className="flex justify-between">
                             <span>Sharpe Ratio:</span>
-                            <span className="font-mono text-green-600">{dashboardData.portfolio_optimization.projected_metrics.sharpe_ratio.toFixed(2)}</span>
+                            <span className="font-mono text-green-600">{dashboardData.portfolio_optimization?.projected_metrics?.sharpe_ratio?.toFixed(2) || 'N/A'}</span>
                           </div>
                           <div className="flex justify-between">
                             <span>Max Drawdown:</span>
-                            <span className="font-mono text-green-600">{(dashboardData.portfolio_optimization.projected_metrics.max_drawdown * 100).toFixed(1)}%</span>
+                            <span className="font-mono text-green-600">{((dashboardData.portfolio_optimization?.projected_metrics?.max_drawdown || 0) * 100).toFixed(1)}%</span>
                           </div>
                           <div className="flex justify-between">
                             <span>Win Rate:</span>
-                            <span className="font-mono text-green-600">{(dashboardData.portfolio_optimization.projected_metrics.win_rate * 100).toFixed(1)}%</span>
+                            <span className="font-mono text-green-600">{((dashboardData.portfolio_optimization?.projected_metrics?.win_rate || 0) * 100).toFixed(1)}%</span>
                           </div>
                           <div className="flex justify-between">
                             <span>Avg Return:</span>
-                            <span className="font-mono text-green-600">{(dashboardData.portfolio_optimization.projected_metrics.avg_return * 100).toFixed(1)}%</span>
+                            <span className="font-mono text-green-600">{((dashboardData.portfolio_optimization?.projected_metrics?.avg_return || 0) * 100).toFixed(1)}%</span>
                           </div>
                         </div>
                       </div>
@@ -682,13 +682,13 @@ const AITradeCoach: React.FC = React.memo(() => {
                       <h3 className="font-semibold mb-3">Implementation Plan</h3>
                       <div className="bg-muted p-4 rounded-lg">
                         <div className="flex items-center gap-2 mb-2">
-                          <Badge variant="outline">{dashboardData.portfolio_optimization.implementation.risk_level}</Badge>
+                          <Badge variant="outline">{dashboardData.portfolio_optimization?.implementation?.risk_level || 'Unknown'}</Badge>
                           <span className="text-sm text-muted-foreground">
-                            Timeline: {dashboardData.portfolio_optimization.implementation.timeline}
+                            Timeline: {dashboardData.portfolio_optimization?.implementation?.timeline || 'Not specified'}
                           </span>
                         </div>
                         <ol className="space-y-2">
-                          {dashboardData.portfolio_optimization.implementation.steps.map((step, idx) => (
+                          {(dashboardData.portfolio_optimization?.implementation?.steps || []).map((step, idx) => (
                             <li key={idx} className="text-sm flex items-start gap-2">
                               <span className="bg-blue-100 text-blue-600 rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">
                                 {idx + 1}
@@ -703,9 +703,9 @@ const AITradeCoach: React.FC = React.memo(() => {
                     {/* Confidence Score */}
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium">Confidence Level:</span>
-                      <Progress value={dashboardData.portfolio_optimization.confidence_score * 100} className="flex-1" />
+                      <Progress value={(dashboardData.portfolio_optimization?.confidence_score || 0) * 100} className="flex-1" />
                       <span className="text-sm text-muted-foreground">
-                        {(dashboardData.portfolio_optimization.confidence_score * 100).toFixed(0)}%
+                        {((dashboardData.portfolio_optimization?.confidence_score || 0) * 100).toFixed(0)}%
                       </span>
                     </div>
                   </div>
