@@ -1,19 +1,21 @@
 
+// ✅ Make types reflect reality and stay consistent across code paths
 interface Trade {
   id: string;
   symbol: string;
-  type: 'PUT' | 'CALL';
+  type: 'PUT' | 'CALL' | 'STOCK' | 'PUT_SPREAD' | 'CALL_SPREAD' | 'IRON_CONDOR' | 'STRANGLE' | 'STRADDLE';
   shortStrike: number;
   longStrike: number;
   quantity: number;
-  entryCredit: number;
+  entryCredit: number;          // total credit received (respecting multiplier)
   entryDate: Date;
-  expiration: Date;
+  expiration?: Date;            // may be undefined
   status: 'OPEN' | 'CLOSED' | 'EXPIRED';
   exitPrice?: number;
   exitDate?: Date;
   pnl?: number;
-  // API response fields
+
+  // API response fields (pass-through)
   order_id?: string;
   execution_price?: number;
   commission?: number;
@@ -24,32 +26,35 @@ interface SpreadOpportunity {
   id: string;
   symbol: string;
   strategy_type: string;
-  option_type: string;
+  option_type: 'PUT' | 'CALL';
   strike: number;
   short_strike?: number;
   long_strike?: number;
-  expiration: string;
+  expiration: string;              // ISO
   days_to_expiration: number;
-  premium: number;
+  premium: number;                 // per contract
 }
 
+// Reflect typical server payload; keep strings for raw dates
 interface PositionData {
   order_id?: string;
   id: number;
   symbol: string;
-  type?: string;
-  spread_type?: string;
-  short_strike: number;
-  long_strike: number;
+  type?: string;                   // 'PUT' | 'CALL' | 'STOCK' | spread types, etc.
+  spread_type?: string;            // e.g. 'PUT_SPREAD'
+  short_strike?: number;
+  long_strike?: number;
   quantity: number;
-  entry_credit?: number;
-  entry_price: number;
-  entry_date: string;
-  expiration?: string;
-  expiration_date?: string;
-  status: string;
+  entry_credit?: number;           // total credit or per-contract? normalize later
+  entry_price: number;             // per-contract price
+  entry_date: string;              // ISO
+  expiration?: string | null;
+  expiration_date?: string | null; // some backends use this
+  status: string;                  // 'OPEN'|'CLOSED'|'EXPIRED'|...
   exit_price?: number;
-  exit_date?: string;
+  exit_date?: string | null;
+  pnl?: number;
+  current_pnl?: number;
 }
 
 interface AccountMetrics {
@@ -58,7 +63,9 @@ interface AccountMetrics {
   total_pnl: number;
   today_pnl: number;
   open_positions: number;
-  // Add other expected metrics fields
+
+  // Optional extras you attach later:
+  performanceHistory?: Array<{ t: string | number; v: number }>;
 }
 
 interface SyncResponse {
@@ -66,6 +73,110 @@ interface SyncResponse {
   positions_updated: number;
   success: boolean;
   rate_limited?: boolean;
+}
+
+// ✅ Normalize helpers
+const CONTRACT_MULTIPLIER = 100;
+
+const toDateOrUndefined = (v?: string | null): Date | undefined => {
+  if (!v || v === 'null') return undefined;
+  const d = new Date(v);
+  return isNaN(d.getTime()) ? undefined : d;
+};
+
+const toMandatoryDateOrNow = (v?: string | null): Date => {
+  const d = v ? new Date(v) : new Date();
+  return isNaN(d.getTime()) ? new Date() : d;
+};
+
+const toTradeType = (raw?: string): Trade['type'] => {
+  const t = (raw ?? '').toUpperCase();
+  switch (t) {
+    case 'PUT':
+    case 'CALL':
+    case 'STOCK':
+    case 'PUT_SPREAD':
+    case 'CALL_SPREAD':
+    case 'IRON_CONDOR':
+    case 'STRANGLE':
+    case 'STRADDLE':
+      return t;
+    default:
+      // try mapping spread_type or fallback
+      return 'STOCK';
+  }
+};
+
+const toTradeStatus = (raw: string): Trade['status'] => {
+  const s = (raw ?? '').toUpperCase();
+  return s === 'OPEN' || s === 'CLOSED' || s === 'EXPIRED' ? s : 'OPEN';
+};
+
+const normalizePosition = (p: PositionData): Trade => {
+  const expiration = toDateOrUndefined(p.expiration ?? p.expiration_date);
+  const entryDate = toMandatoryDateOrNow(p.entry_date);
+
+  // entry_credit ambiguity: some APIs give per-contract vs total.
+  // Prefer explicit total 'entry_credit', else compute from entry_price * qty * multiplier.
+  const entryCreditTotal =
+    typeof p.entry_credit === 'number'
+      ? p.entry_credit
+      : (p.entry_price ?? 0) * (p.quantity ?? 0) * CONTRACT_MULTIPLIER;
+
+  return {
+    id: (p.order_id ?? p.id)?.toString(),
+    symbol: p.symbol,
+    type: toTradeType(p.spread_type ?? p.type),
+    shortStrike: p.short_strike ?? 0,
+    longStrike: p.long_strike ?? 0,
+    quantity: p.quantity,
+    entryCredit: entryCreditTotal,
+    entryDate,
+    expiration,
+    status: toTradeStatus(p.status),
+    exitPrice: p.exit_price,
+    exitDate: toDateOrUndefined(p.exit_date ?? undefined),
+    pnl: typeof p.pnl === 'number' ? p.pnl : (typeof p.current_pnl === 'number' ? p.current_pnl : 0),
+
+    // passthrough
+    order_id: p.order_id,
+  };
+};
+
+// ✅ Tiny fetch helper with timeout + robust error info
+const withTimeout = <T>(p: Promise<T>, ms = 15000): Promise<T> => {
+  let t: any;
+  const timeout = new Promise<never>((_, rej) => (t = setTimeout(() => rej(new Error(`Timeout ${ms}ms`)), ms)));
+  return Promise.race([p, timeout]).finally(() => clearTimeout(t));
+};
+
+async function fetchJSON<T>(input: RequestInfo, init?: RequestInit & { timeoutMs?: number }): Promise<T> {
+  const controller = new AbortController();
+  const timeoutMs = init?.timeoutMs ?? 15000;
+  const merged: RequestInit = { ...init, signal: controller.signal };
+
+  try {
+    const res = await withTimeout(fetch(input, merged), timeoutMs);
+    if (!res.ok) {
+      let detail = `${res.status} ${res.statusText}`;
+      try {
+        const j = await res.clone().json();
+        detail = j?.detail || j?.message || detail;
+      } catch {
+        const t = await res.text().catch(() => '');
+        if (t) detail = `${detail} — ${t}`;
+      }
+      throw new Error(`HTTP ${detail}`);
+    }
+    try {
+      return await res.json();
+    } catch {
+      // empty body or not JSON
+      return {} as T;
+    }
+  } finally {
+    controller.abort();
+  }
 }
 
 export class RealTradingService {
@@ -80,130 +191,59 @@ export class RealTradingService {
     // This prevents excessive background API calls when no one is actively viewing positions
   }
 
+  // ---- EXECUTE ----
   async executeTrade(spread: SpreadOpportunity, quantity: number): Promise<Trade> {
-    try {
-      const response = await fetch(`${this.baseUrl}/trading/execute`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          id: spread.id,
-          symbol: spread.symbol,
-          strategy_type: spread.strategy_type,
-          option_type: spread.option_type,
-          strike: spread.strike,
-          short_strike: spread.short_strike,
-          long_strike: spread.long_strike,
-          expiration: spread.expiration,
-          days_to_expiration: spread.days_to_expiration,
-          premium: spread.premium,
-          quantity: quantity,
-        })
-      });
-      
-      if (!response || !response.ok) {
-        const errorData = await response?.json();
-        throw new Error(`HTTP ${response?.status}: ${errorData?.detail}`);
-      }
-      
-      const trade = await response.json();
-      
-      // Reload all trades to get updated data
-      await this.loadTrades();
-      
-      return trade;
-    } catch (error) {
-      console.error('Error executing trade:', error);
-      throw new Error(`Failed to execute trade: ${error}`);
-    }
+    const payload = {
+      id: spread.id,
+      symbol: spread.symbol,
+      strategy_type: spread.strategy_type,
+      option_type: spread.option_type,
+      strike: spread.strike,
+      short_strike: spread.short_strike,
+      long_strike: spread.long_strike,
+      expiration: spread.expiration,
+      days_to_expiration: spread.days_to_expiration,
+      premium: spread.premium,
+      quantity,
+    };
+
+    const trade = await fetchJSON<PositionData | Trade>(`${this.baseUrl}/trading/execute`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      timeoutMs: 20000,
+    });
+
+    // Some backends return a position-like object; normalize both cases
+    const normalized: Trade = (trade as any).entry_date
+      ? normalizePosition(trade as PositionData)
+      : (trade as Trade);
+
+    await this.loadTrades();
+    return normalized;
   }
 
-  async closeTrade(tradeId: string, exitPrice: number): Promise<{message?: string, cancelled_orders?: string[], cancelled_count?: number}> {
-    try {
-      const response = await fetch(`${this.baseUrl}/positions/close/${tradeId}?exit_price=${exitPrice}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      });
-      
-      if (!response || !response.ok) {
-        const errorData = await response?.json();
-        throw new Error(errorData?.detail || `HTTP ${response?.status}: ${response?.statusText}`);
-      }
-      
-      const result = await response.json();
-      
-      // Reload all trades to get updated data
-      await this.loadTrades();
-      
-      return {
-        message: result.message,
-        cancelled_orders: result.cancelled_orders,
-        cancelled_count: result.cancelled_count
-      };
-    } catch (error) {
-      console.error('Error closing trade:', error);
-      throw error;
-    }
+  // ---- CLOSE ----
+  async closeTrade(tradeId: string, exitPrice: number): Promise<{message?: string; cancelled_orders?: string[]; cancelled_count?: number}> {
+    const result = await fetchJSON<{message?: string; cancelled_orders?: string[]; cancelled_count?: number}>(
+      `${this.baseUrl}/positions/close/${tradeId}?exit_price=${exitPrice}`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, timeoutMs: 20000 }
+    );
+    await this.loadTrades();
+    return result;
   }
 
   private trades: Trade[] = [];
   
+  // ---- LOAD ----
   async loadTrades(): Promise<void> {
     try {
-      const response = await fetch(`${this.baseUrl}/positions/?sync=false`);
-      
-      if (!response || !response.ok) {
-        throw new Error(`HTTP response not ok: ${response?.status}: ${response?.statusText}`);
-      }
-      
-      const data = await response.json();
-      this.trades = data.map((position: PositionData) => {
-        // Parse expiration date properly, handling null/undefined
-        let expirationDate: Date | undefined;
-        const expDateString = position.expiration || position.expiration_date;
-        if (expDateString && expDateString !== 'null') {
-          expirationDate = new Date(expDateString);
-          // Check if date is valid
-          if (isNaN(expirationDate.getTime())) {
-            expirationDate = undefined;
-          }
-        }
-
-        // Parse entry date properly
-        let entryDate: Date;
-        try {
-          entryDate = new Date(position.entry_date);
-          if (isNaN(entryDate.getTime())) {
-            entryDate = new Date(); // Fallback to current date
-          }
-        } catch {
-          entryDate = new Date(); // Fallback to current date
-        }
-
-        return {
-          id: position.order_id || position.id.toString(),
-          symbol: position.symbol,
-          type: (position.type || position.spread_type || 'STOCK').toUpperCase(),
-          shortStrike: position.short_strike || 0,
-          longStrike: position.long_strike || 0,
-          quantity: position.quantity,
-          entryCredit: position.entry_credit || (position.entry_price * position.quantity),
-          entryDate: entryDate,
-          expiration: expirationDate,
-          status: position.status.toUpperCase(),
-          exitPrice: position.exit_price,
-          exitDate: position.exit_date ? new Date(position.exit_date) : undefined,
-          pnl: position.pnl || position.current_pnl || 0
-        };
-      });
-      
+      const data = await fetchJSON<PositionData[]>(`${this.baseUrl}/positions/?sync=false`, { timeoutMs: 15000 });
+      this.trades = Array.isArray(data) ? data.map(normalizePosition) : [];
       this.notifyListeners();
-    } catch (error) {
-      console.error('Error loading trades:', error);
-      // Don't throw error, just log it - UI should handle empty state
+    } catch (err) {
+      console.error('Error loading trades:', err);
+      // keep old trades; UI can render stale or empty state
     }
   }
   
@@ -215,94 +255,83 @@ export class RealTradingService {
     return this.trades.filter(t => t.status === 'OPEN');
   }
 
+  // ---- SYNC ----
   async syncPositions(): Promise<SyncResponse> {
     try {
-      const response = await fetch(`${this.baseUrl}/positions/sync`, {
+      const syncResult = await fetchJSON<any>(`${this.baseUrl}/positions/sync`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
+        timeoutMs: 20000,
       });
-      
-      if (!response || !response.ok) {
-        throw new Error(`HTTP response not ok: ${response?.status}: ${response?.statusText}`);
+
+      if (syncResult?.status === 'rate_limited') {
+        return { message: syncResult.message ?? 'Rate limited', positions_updated: 0, success: false, rate_limited: true };
       }
-      
-      const syncResult = await response.json();
-      
-      // Handle rate limiting gracefully
-      if (syncResult.status === 'rate_limited') {
-        console.warn('Position sync rate limited:', syncResult.message);
-        // Return the rate limited response instead of treating it as an error
-        return {
-          message: syncResult.message,
-          positions_updated: 0,
-          success: false,
-          rate_limited: true
-        };
-      }
-      
-      console.log('Position sync result:', syncResult);
+
       return {
-        message: syncResult.message || 'Sync completed',
-        positions_updated: syncResult.sync_results?.synced_positions || 0,
-        success: syncResult.status === 'success'
+        message: syncResult?.message ?? 'Sync completed',
+        positions_updated: syncResult?.sync_results?.synced_positions ?? 0,
+        success: syncResult?.status === 'success',
       };
-    } catch (error) {
-      console.error('Error syncing positions:', error);
-      throw error;
+    } catch (err) {
+      console.error('Error syncing positions:', err);
+      // Surface as failure but not rate-limited
+      return { message: (err as Error).message ?? 'Sync failed', positions_updated: 0, success: false };
     }
   }
 
+  // ---- METRICS ----
   async getAccountMetrics(): Promise<AccountMetrics> {
     try {
-      const response = await fetch(`${this.baseUrl}/dashboard/metrics`);
-      
-      if (!response || !response.ok) {
-        throw new Error(`HTTP response not ok: ${response?.status}: ${response?.statusText}`);
-      }
-      
-      const metrics = await response.json();
-      
-      // Also fetch performance history data for charts
+      const metrics = await fetchJSON<AccountMetrics>(`${this.baseUrl}/dashboard/metrics`, { timeoutMs: 15000 });
+
       try {
-        const perfResponse = await fetch(`${this.baseUrl}/dashboard/performance?days=30`);
-        if (perfResponse.ok) {
-          const perfData = await perfResponse.json();
-          metrics.performanceHistory = perfData.data;
-        }
+        const perf = await fetchJSON<{ data: Array<{ t: string | number; v: number }> }>(
+          `${this.baseUrl}/dashboard/performance?days=30`,
+          { timeoutMs: 15000 }
+        );
+        (metrics as AccountMetrics).performanceHistory = Array.isArray(perf?.data) ? perf.data : [];
       } catch (perfError) {
         console.warn('Failed to fetch performance history:', perfError);
-        metrics.performanceHistory = [];
+        (metrics as AccountMetrics).performanceHistory = [];
       }
-      
-      return metrics;
-    } catch (error) {
-      console.error('Error fetching account metrics:', error);
+
+      // Ensure required fields exist with sane defaults
       return {
-        totalPnL: 0,
-        winRate: 0,
-        avgWin: 0,
-        avgLoss: 0,
-        accountValue: 0,
-        dailyPnL: 0,
-        performanceHistory: []
+        account_balance: metrics.account_balance ?? 0,
+        buying_power: metrics.buying_power ?? 0,
+        total_pnl: metrics.total_pnl ?? 0,
+        today_pnl: metrics.today_pnl ?? 0,
+        open_positions: metrics.open_positions ?? 0,
+        performanceHistory: metrics.performanceHistory ?? [],
+      };
+    } catch (err) {
+      console.error('Error fetching account metrics:', err);
+      return {
+        account_balance: 0,
+        buying_power: 0,
+        total_pnl: 0,
+        today_pnl: 0,
+        open_positions: 0,
+        performanceHistory: [],
       };
     }
   }
 
+  // ---- SUBSCRIBE ----
   subscribe(listener: (trades: Trade[]) => void): () => void {
     this.listeners.push(listener);
     return () => {
-      const index = this.listeners.indexOf(listener);
-      if (index > -1) {
-        this.listeners.splice(index, 1);
-      }
+      this.listeners = this.listeners.filter(l => l !== listener);
     };
   }
 
   private notifyListeners(): void {
-    this.listeners.forEach(listener => listener(this.getTrades()));
+    const snapshot = this.getTrades();
+    // prevent mutation surprises
+    this.listeners.forEach(l => {
+      try { l(snapshot); } catch (e) { console.error('Listener error:', e); }
+    });
   }
 }
 

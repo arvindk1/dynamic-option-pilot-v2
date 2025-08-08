@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, memo, Suspense, lazy } from 'react';
+// Removed performance monitoring - was causing render loops
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -26,7 +27,8 @@ import {
   Brain,
   Moon,
   Sun,
-  Newspaper
+  Newspaper,
+  Loader2 // ✅ add this
 } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useRealTimeData } from '@/hooks/useRealTimeData';
@@ -37,21 +39,39 @@ import { DynamicStrategyTabs } from '@/components/DynamicStrategyTabs';
 import { WebSocketStatus } from '@/components/WebSocketStatus';
 import { TradingTour, TourTrigger } from '@/components/TradingTour';
 import MarketStatusWidget from '@/components/MarketStatusWidget';
-// MarketCommentary is imported via LazyTabContent for better performance
+// Direct lazy imports for better performance
 import { DemoDataService } from '@/services/demoData';
 import SystemStatus from '@/components/SystemStatus';
 import DemoModeAlert from '@/components/DemoModeAlert';
 import { dataThrottleService } from '@/services/dataThrottle';
-import { 
-  LazyTabContent,
-  LazySentimentDashboard,
-  LazyEconomicEventsDashboard,
-  LazyAITradeCoach,
-  LazyEnhancedSignalsTab,
-  LazyEnhancedRiskTab,
-  LazyTradeManager,
-  LazyMarketCommentary
-} from '@/components/LazyTabContent';
+
+// Direct lazy component imports
+const LazySentimentDashboard = lazy(() => 
+  import('@/components/SentimentDashboard').then(module => ({ 
+    default: module.SentimentDashboard 
+  }))
+);
+
+const LazyEconomicEventsDashboard = lazy(() => 
+  import('@/components/EconomicEventsDashboard').then(module => ({
+    default: module.default
+  }))
+);
+
+const LazyAITradeCoach = lazy(() => 
+  import('@/components/AITradeCoach').then(module => ({
+    default: module.default
+  }))
+);
+
+const LazyMarketCommentary = lazy(() => 
+  import('@/components/MarketCommentary').then(module => ({
+    default: module.MarketCommentary || module.default
+  }))
+);
+import { TradeManager } from '@/components/TradeManager';
+import EnhancedSignalsTab from '@/components/EnhancedSignalsTab';
+import EnhancedRiskTab from '@/components/EnhancedRiskTab';
 import { useTabPreload } from '@/hooks/useTabPreload';
 import { TabPerformanceMonitor } from '@/components/TabPerformanceMonitor';
 import { tabPerformanceService } from '@/services/tabPerformance';
@@ -61,7 +81,33 @@ import { useAccessibility } from '@/components/AccessibilityProvider';
 import { TradingCardSkeleton, DashboardLoadingState } from '@/components/LoadingStates';
 import { TieredNavigation } from '@/components/TieredNavigation';
 import { HelpMenu } from '@/components/HelpMenu';
+import { DashboardHeader } from '@/components/DashboardHeader';
 import { StrategiesTab } from '@/components/StrategiesTab';
+
+// Helper for normalizing percentages
+const asPercent = (n: number | undefined | null) => {
+  if (n == null || Number.isNaN(n)) return 0;
+  return n > 1 ? n : n * 100;
+};
+
+// Clean tab panel helper - strictly presentational
+type TabPanelProps = {
+  children: React.ReactNode;
+  className?: string;
+};
+
+const TabPanel = ({ children, className = "space-y-6" }: TabPanelProps) => (
+  <div className={className}>
+    <Suspense fallback={
+      <div className="flex items-center justify-center p-8">
+        <Loader2 className="h-6 w-6 animate-spin mr-2" />
+        Loading...
+      </div>
+    }>
+      {children}
+    </Suspense>
+  </div>
+);
 
 interface TradingConfig {
   brokerPlugin: string;
@@ -153,6 +199,36 @@ interface EnhancedTradeOpportunity {
   probability_profit: number;
   expected_value: number;
   delta: number;
+  
+  // Enhanced Scoring Data
+  overall_score?: number;              // 0-100 composite score
+  confidence_percentage?: number;       // 0-100 confidence level
+  quality_tier?: 'HIGH' | 'MEDIUM' | 'LOW';  // Quality classification
+  profit_explanation?: string;         // LLM-generated explanation
+  
+  // Score Breakdown (for transparency)
+  score_breakdown?: {
+    technical: number;        // Technical analysis score
+    liquidity: number;        // Liquidity score  
+    risk_adjusted: number;    // Risk-adjusted return score
+    probability: number;      // Probability-based score
+    volatility: number;       // Volatility conditions score
+    time_decay: number;       // Time decay efficiency score
+    market_regime: number;    // Market regime alignment score
+  };
+  
+  // Individual Component Scores (for detailed display)
+  technical_score?: number;
+  liquidity_score?: number;
+  risk_adjusted_score?: number;
+  probability_score?: number;
+  volatility_score?: number;
+  time_decay_score?: number;
+  market_regime_score?: number;
+  
+  // Metadata
+  scoring_enabled?: boolean;
+  score_version?: string;
   gamma?: number;
   theta?: number;
   vega?: number;
@@ -192,6 +268,8 @@ interface RiskMetrics {
 const TradingDashboard = React.memo(() => {
   const { theme, toggleTheme } = useTheme();
   const { announceToScreenReader } = useAccessibility();
+  
+  // Performance monitoring removed - was causing render loops
   
   // Demo mode and tour state
   const [isDemoMode, setIsDemoMode] = useState(false); // Default to false, will be determined async
@@ -249,7 +327,7 @@ const TradingDashboard = React.memo(() => {
     wsConnected
   } = useRealTimeData();
 
-  // Enhanced trade execution callback that links to position tracking
+  // Enhanced trade execution callback that links to position tracking - memoized
   const handleTradeExecuted = useCallback((pnl: number) => {
     // Add performance data point
     addPerformancePoint(pnl);
@@ -301,24 +379,24 @@ const TradingDashboard = React.memo(() => {
   const [confidence, setConfidence] = useState(0.72);
   const [volatilityRegime, setVolatilityRegime] = useState<'HIGH_VOL' | 'NORMAL_VOL' | 'LOW_VOL'>('NORMAL_VOL');
 
-  // Load real account metrics
-  const loadAccountMetrics = useCallback(async () => {
+  // Load real account metrics - memoized with dependency array
+  const loadAccountMetrics = React.useRef(async () => {
     try {
-      // Use demo data when in demo mode
-      const endpoint = isDemoMode ? '/api/demo/account/metrics' : '/api/dashboard/metrics';
-      
-      // Use throttled data service to prevent excessive calls
-      const metrics = await dataThrottleService.getData(
-        `account-metrics-${isDemoMode}`,
-        async () => {
-          const response = await fetch(endpoint);
-          if (response.ok) {
-            return await response.json();
-          }
-          throw new Error('Failed to fetch account metrics');
-        },
-        180000 // Cache for 3 minutes
-      );
+        // Use demo data when in demo mode
+        const endpoint = isDemoMode ? '/api/demo/account/metrics' : '/api/dashboard/metrics';
+        
+        // Use throttled data service to prevent excessive calls
+        const metrics = await dataThrottleService.getData(
+          `account-metrics-${isDemoMode}`,
+          async () => {
+            const response = await fetch(endpoint);
+            if (response.ok) {
+              return await response.json();
+            }
+            throw new Error('Failed to fetch account metrics');
+          },
+          180000 // Cache for 3 minutes
+        );
       
       if (metrics) {
         setAccountMetrics({
@@ -346,9 +424,9 @@ const TradingDashboard = React.memo(() => {
         });
       }
     } catch (error) {
-      console.error('Failed to load account metrics:', error);
-    }
-  }, [isDemoMode]);
+        console.error('Failed to load account metrics:', error);
+      }
+  }).current;
 
   // Load advanced risk metrics
   const loadRiskMetrics = useCallback(async () => {
@@ -391,25 +469,25 @@ const TradingDashboard = React.memo(() => {
     refresh_rate: string;
   } | null>(null);
 
-  // Load real trading opportunities from backend
+  // Load real trading opportunities from backend - memoized
   const loadTradingOpportunities = useCallback(async () => {
-    setLoadingOpportunities(true);
     try {
-      // Use demo data when in demo mode
-      const endpoint = isDemoMode ? '/api/demo/opportunities' : '/api/trading/opportunities';
-      
-      // Use throttled data service to prevent excessive calls
-      const data = await dataThrottleService.getData(
-        `trading-opportunities-${isDemoMode}`,
-        async () => {
-          const response = await fetch(endpoint);
-          if (response.ok) {
-            return await response.json();
-          }
-          throw new Error('Failed to fetch trading opportunities');
-        },
-        240000 // Cache for 4 minutes
-      );
+      setLoadingOpportunities(true);
+        // Use demo data when in demo mode
+        const endpoint = isDemoMode ? '/api/demo/opportunities' : '/api/trading/opportunities';
+        
+        // Use throttled data service to prevent excessive calls
+        const data = await dataThrottleService.getData(
+          `trading-opportunities-${isDemoMode}`,
+          async () => {
+            const response = await fetch(endpoint);
+            if (response.ok) {
+              return await response.json();
+            }
+            throw new Error('Failed to fetch trading opportunities');
+          },
+          240000 // Cache for 4 minutes
+        );
       
       if (data) {
         
@@ -505,6 +583,18 @@ const TradingDashboard = React.memo(() => {
     initializeDemoMode();
   }, []);
 
+  // Cache warming - preload components in background
+  useEffect(() => {
+    // Fire-and-forget imports to warm the cache
+    import("@/components/EnhancedSignalsTab");
+    import("@/components/EnhancedRiskTab");
+    import("@/components/TradeManager");
+    import("@/components/MarketCommentary");
+    import("@/components/SentimentDashboard");
+    import("@/components/EconomicEventsDashboard");
+    import("@/components/AITradeCoach");
+  }, []);
+
   // Auto-start tour for first-time visitors (only after demo mode is initialized)
   useEffect(() => {
     if (demoModeInitialized && isFirstVisit && DemoDataService.shouldShowTour()) {
@@ -520,22 +610,29 @@ const TradingDashboard = React.memo(() => {
   }, [isFirstVisit, isDemoMode, demoModeInitialized]);
   
   useEffect(() => {
-    // Only start loading data after demo mode has been initialized
-    if (demoModeInitialized) {
-      loadAccountMetrics();
-      loadRiskMetrics();
-      loadTradingOpportunities();
-      const interval = setInterval(() => {
-        loadAccountMetrics();
-        loadRiskMetrics();
-      }, 300000); // Update every 5 minutes (reduced from 60 seconds)
-      const opportunitiesInterval = setInterval(loadTradingOpportunities, 300000); // Update every 5 minutes (reduced from 2 minutes)
-      return () => {
-        clearInterval(interval);
-        clearInterval(opportunitiesInterval);
-      };
-    }
-  }, [demoModeInitialized, loadAccountMetrics, loadRiskMetrics, loadTradingOpportunities]);
+    if (!demoModeInitialized) return;
+
+    const METRIC_MS = 300_000; // 5m
+    const OPP_MS    = 300_000; // 5m
+
+    let metricsTimer: number | undefined;
+    let oppsTimer: number | undefined;
+
+    const tickMetrics = async () => { await loadAccountMetrics(); await loadRiskMetrics(); };
+    const tickOpps = async () => { await loadTradingOpportunities(); };
+
+    // initial tick
+    tickMetrics(); 
+    tickOpps();
+
+    metricsTimer = window.setInterval(tickMetrics, METRIC_MS);
+    oppsTimer = window.setInterval(tickOpps, OPP_MS);
+
+    return () => {
+      if (metricsTimer) clearInterval(metricsTimer);
+      if (oppsTimer) clearInterval(oppsTimer);
+    };
+  }, [demoModeInitialized, isDemoMode, loadTradingOpportunities]);
 
   const pluginStatus = [
     { name: 'Data Ingestion', status: 'active', lastUpdate: '2 min ago', plugin: 'alpaca' },
@@ -570,85 +667,16 @@ const TradingDashboard = React.memo(() => {
       <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 text-foreground">
         <div className="max-w-7xl mx-auto">
           {/* Header */}
-          <header className="sticky top-0 z-50 bg-background/95 backdrop-blur-md border-b border-border/40 px-6 py-4 shadow-sm">
-            <div className="flex items-center justify-between w-full">
-              <div>
-                <h1 className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-blue-400 via-purple-400 to-emerald-400 bg-clip-text text-transparent">
-                  Dynamic Options Pilot
-                </h1>
-                <p className="text-muted-foreground mt-1 text-sm lg:text-base">Algorithmic Options Trading Platform</p>
-              </div>
-              <div className="flex items-center gap-3 lg:gap-4">
-              {/* Demo Mode Toggle */}
-              <div className="demo-mode-toggle flex items-center gap-2 px-3 py-2 bg-card/50 border rounded-lg backdrop-blur-sm">
-                <Label htmlFor="demo-mode" className="text-xs lg:text-sm font-medium">Demo</Label>
-                <Switch
-                  id="demo-mode"
-                  checked={isDemoMode}
-                  onCheckedChange={handleDemoModeToggle}
-                />
-              </div>
-            
-            {/* Help Menu */}
-            <HelpMenu onStartTour={handleStartTour} />
-            
-            {/* Tour Trigger - Show only for first-time visitors */}
-            {!isFirstVisit && (
-              <TourTrigger onStartTour={handleStartTour} variant="link" />
-            )}
-            
-              <Button variant="outline" size="icon" onClick={toggleTheme} className="hover:bg-accent/50">
-                {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-              </Button>
-              
-              <Badge variant={config.paperTrading ? "secondary" : "destructive"} className="px-2 py-1 text-xs">
-                {config.paperTrading ? 'Paper' : 'Live'}
-              </Badge>
-              
-              <WebSocketStatus />
-              
-              <div className="dashboard-overview hidden lg:block text-right space-y-2 bg-gradient-to-br from-card/40 to-card/20 p-4 rounded-lg backdrop-blur-sm border border-border/50 shadow-lg min-w-[240px]">
-                {/* Account Balance - Primary metric */}
-                <div className="border-b border-border/30 pb-2">
-                  <div className="text-2xl font-bold text-emerald-400">${accountMetrics.account_balance.toLocaleString()}</div>
-                  <div className="text-xs text-muted-foreground">Account Balance</div>
-                </div>
-                
-                {/* Key Trading Metrics */}
-                <div className="space-y-1.5">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Cash:</span>
-                    <span className="text-blue-400 font-medium">${accountMetrics.cash.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Buying Power:</span>
-                    <span className="text-purple-400 font-medium">${accountMetrics.buying_power.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">P&L Today:</span>
-                    <span className={`font-medium ${accountMetrics.total_pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                      {accountMetrics.total_pnl >= 0 ? '+' : ''}${accountMetrics.total_pnl.toLocaleString()}
-                    </span>
-                  </div>
-                </div>
-                
-                {/* Options Level & Status */}
-                <div className="pt-2 border-t border-border/30">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="text-muted-foreground">Options Level:</span>
-                    <Badge variant="secondary" className="text-xs">{accountMetrics.options_level}</Badge>
-                  </div>
-                  <div className="flex justify-between items-center text-xs mt-1">
-                    <span className="text-muted-foreground">Status:</span>
-                    <Badge variant={accountMetrics.account_status === 'ACTIVE' ? 'default' : 'secondary'} className="text-xs">
-                      {accountMetrics.account_status}
-                    </Badge>
-                  </div>
-                </div>
-              </div>
-              </div>
-            </div>
-          </header>
+          <DashboardHeader
+            theme={theme}
+            toggleTheme={toggleTheme}
+            isDemoMode={isDemoMode}
+            onDemoModeToggle={handleDemoModeToggle}
+            onStartTour={handleStartTour}
+            isFirstVisit={isFirstVisit}
+            config={config}
+            accountMetrics={accountMetrics}
+          />
 
           <main id="main-content" role="main" className="p-8 space-y-8">
             <TieredNavigation 
@@ -677,17 +705,13 @@ const TradingDashboard = React.memo(() => {
             {/* Market Commentary Section */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2">
-                <LazyTabContent 
-                  isActive={activeTab === "overview"}
-                  preload={preloadedTabs.has("overview")}
-                  loadOnMount={true}
-                >
+                <Suspense fallback={<div className="flex items-center justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /><span className="ml-2">Loading commentary...</span></div>}>
                   <LazyMarketCommentary 
                     compact={false} 
                     allowCollapse={true}
                     onNavigateToCommentary={() => setActiveTab("commentary")}
                   />
-                </LazyTabContent>
+                </Suspense>
               </div>
               <div>
                 <MarketStatusWidget compact={false} />
@@ -786,42 +810,30 @@ const TradingDashboard = React.memo(() => {
 
           {/* Sentiment Tab */}
           <TabsContent value="sentiment" className="space-y-6">
-            <LazyTabContent 
-              isActive={activeTab === "sentiment"}
-              preload={preloadedTabs.has("sentiment")}
-            >
+            <TabPanel>
               <LazySentimentDashboard />
-            </LazyTabContent>
+            </TabPanel>
           </TabsContent>
 
           {/* Economic Events Tab */}
           <TabsContent value="economic" className="space-y-6">
-            <LazyTabContent 
-              isActive={activeTab === "economic"}
-              preload={preloadedTabs.has("economic")}
-            >
+            <TabPanel>
               <LazyEconomicEventsDashboard />
-            </LazyTabContent>
+            </TabPanel>
           </TabsContent>
 
           {/* AI Trade Coach Tab */}
           <TabsContent value="ai-coach" className="space-y-6">
-            <LazyTabContent 
-              isActive={activeTab === "ai-coach"}
-              preload={preloadedTabs.has("ai-coach")}
-            >
+            <TabPanel>
               <LazyAITradeCoach />
-            </LazyTabContent>
+            </TabPanel>
           </TabsContent>
 
           {/* Enhanced Signals Tab */}
-          <TabsContent value="signals" className="space-y-6">
-            <LazyTabContent 
-              isActive={activeTab === "signals"}
-              preload={preloadedTabs.has("signals")}
-            >
-              <LazyEnhancedSignalsTab />
-            </LazyTabContent>
+          <TabsContent value="signals">
+            <TabPanel>
+              <EnhancedSignalsTab />
+            </TabPanel>
           </TabsContent>
 
           {/* Trading → Execution Tab - Live trading opportunities from production strategies */}
@@ -850,56 +862,40 @@ const TradingDashboard = React.memo(() => {
               </div>
             )}
             
-            <LazyTabContent 
-              isActive={activeTab === "trades"}
-              preload={preloadedTabs.has("trades")}
-              loadOnMount={true}
-            >
+            <Suspense fallback={<div className="flex items-center justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /><span className="ml-2">Loading strategies...</span></div>}>
               <DynamicStrategyTabs 
                 onTradeExecuted={handleTradeExecuted}
                 symbol={config.symbol}
               />
-            </LazyTabContent>
+            </Suspense>
           </TabsContent>
 
           {/* Positions Tab */}
-          <TabsContent value="positions" className="space-y-6">
-            <LazyTabContent 
-              isActive={activeTab === "positions"}
-              preload={preloadedTabs.has("positions")}
-            >
-              <LazyTradeManager />
-            </LazyTabContent>
+          <TabsContent value="positions">
+            <TabPanel>
+              <TradeManager />
+            </TabPanel>
           </TabsContent>
 
           {/* Commentary Tab */}
           <TabsContent value="commentary" className="space-y-6">
-            <LazyTabContent 
-              isActive={activeTab === "commentary"}
-              preload={preloadedTabs.has("commentary")}
-            >
+            <TabPanel>
               <LazyMarketCommentary compact={false} />
-            </LazyTabContent>
+            </TabPanel>
           </TabsContent>
 
           {/* Enhanced Risk Tab */}
-          <TabsContent value="risk" className="space-y-6">
-            <LazyTabContent 
-              isActive={activeTab === "risk"}
-              preload={preloadedTabs.has("risk")}
-            >
-              <LazyEnhancedRiskTab />
-            </LazyTabContent>
+          <TabsContent value="risk">
+            <TabPanel>
+              <EnhancedRiskTab />
+            </TabPanel>
           </TabsContent>
 
           {/* Strategies Tab - Strategy Sandbox for creating and testing custom strategies */}
-          <TabsContent value="strategies" className="space-y-6">
-            <LazyTabContent 
-              isActive={activeTab === "strategies"}
-              preload={preloadedTabs.has("strategies")}
-            >
+          <TabsContent value="strategies">
+            <TabPanel>
               <StrategiesTab />
-            </LazyTabContent>
+            </TabPanel>
           </TabsContent>
 
           {/* Config Tab */}

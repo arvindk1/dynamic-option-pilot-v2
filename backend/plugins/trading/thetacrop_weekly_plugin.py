@@ -435,6 +435,7 @@ class ThetaCropWeeklyPlugin(BaseStrategyPlugin, V1StrategyMigrationMixin):
                 symbol=setup.underlying,
                 strategy_type="theta_harvesting",
                 strategy_id=self.strategy_config.strategy_id,
+                universe="thetacrop",  # CRITICAL FIX: Add universe attribute
                 
                 # Iron condor structure
                 option_type="BOTH",  # Iron condor uses both calls and puts

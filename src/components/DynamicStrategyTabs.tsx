@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, Activity, TrendingUp, Target, Zap, Brain, AlertTriangle, Timer, RefreshCw, DollarSign, Shield } from 'lucide-react';
 import { useStrategies, StrategyMetadata } from '@/contexts/StrategyContext';
-import { TradeCard } from '@/components/TradeCard';
+import { ResponsiveTradeCard } from '@/components/TradeCard/TradeCard';
 import { paperTradingService } from '@/services/paperTrading';
 import { useToast } from '@/hooks/use-toast';
 
@@ -243,7 +243,7 @@ const AllOpportunitiesView: React.FC<AllOpportunitiesViewProps> = ({
             
             <div className="space-y-4">
               {uniqueOpportunities.map((opportunity) => (
-                <TradeCard
+                <ResponsiveTradeCard
                   key={opportunity.id}
                   trade={opportunity}
                   onExecute={handleTradeExecution}
@@ -344,7 +344,7 @@ const StrategyOpportunitiesView: React.FC<StrategyOpportunitiesViewProps> = ({
   return (
     <div className="space-y-4">
       {uniqueOpportunities.map((opportunity) => (
-        <TradeCard
+        <ResponsiveTradeCard
           key={opportunity.id}
           trade={opportunity}
           onExecute={handleTradeExecution}

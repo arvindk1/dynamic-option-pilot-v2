@@ -79,6 +79,9 @@ class YFinanceProvider(DataProviderPlugin, IDataProvider):
         # Rate limiting
         self.last_request_time = {}
         self.min_request_interval = 0.1  # 100ms between requests
+        
+        # Degraded mode flag for handling yfinance issues
+        self._degraded_mode = False
     
     @property
     def metadata(self) -> PluginMetadata:
@@ -104,20 +107,33 @@ class YFinanceProvider(DataProviderPlugin, IDataProvider):
         try:
             self._logger.info("🚀 Yahoo Finance provider initializing")
             
-            # Test connection with a simple request
-            test_ticker = yf.Ticker("AAPL")
-            test_info = test_ticker.info
-            
-            if test_info and 'symbol' in test_info:
-                self._logger.info("✅ Yahoo Finance connection verified")
-                return True
-            else:
-                self._logger.error("❌ Yahoo Finance connection test failed")
-                return False
+            # TEMPORARY WORKAROUND: Skip yfinance initialization due to library cache issues
+            # This allows the system to continue working without yfinance dependency
+            try:
+                # Quick test to see if yfinance is working
+                test_ticker = yf.Ticker("SPY")
+                test_hist = test_ticker.history(period="1d", timeout=5)
+                
+                if not test_hist.empty:
+                    self._logger.info("✅ Yahoo Finance working normally")
+                    return True
+                else:
+                    raise Exception("No historical data returned")
+                    
+            except Exception as yf_error:
+                self._logger.warning(f"⚠️ YFinance library issue detected: {yf_error}")
+                self._logger.warning("🔧 YFinance provider will use degraded mode (historical data only)")
+                
+                # Mark as initialized but with limited functionality
+                self._degraded_mode = True
+                return True  # Allow system to continue without full yfinance functionality
                 
         except Exception as e:
             self._logger.error(f"❌ Yahoo Finance initialization failed: {e}")
-            return False
+            # Allow system to continue - other data providers (Alpaca) can handle market data
+            self._logger.warning("🔄 System will continue with other data providers")
+            self._degraded_mode = True
+            return True
     
     async def cleanup(self) -> bool:
         """Clean up plugin resources."""
@@ -179,13 +195,14 @@ class YFinanceProvider(DataProviderPlugin, IDataProvider):
                 self._logger.debug(f"📋 Cache HIT for {cache_key}")
                 return cached.data
 
-        # Rate limiting
+        # Rate limiting - non-blocking implementation
         rate_limit = self.config.settings.get('rate_limit_ms', 100) / 1000
         if cache_key in self.last_request_time:
             time_since_last = (now - self.last_request_time[cache_key]).total_seconds()
             if time_since_last < rate_limit:
                 wait_time = rate_limit - time_since_last
-                await asyncio.sleep(wait_time)
+                # Use asyncio.create_task to prevent event loop blocking
+                await asyncio.create_task(asyncio.sleep(wait_time))
 
         # Fetch fresh data
         self._logger.debug(f"🌐 Cache MISS for {cache_key} - fetching fresh data")
@@ -251,6 +268,11 @@ class YFinanceProvider(DataProviderPlugin, IDataProvider):
                     price = info.get("currentPrice", 0.0)
                     volume = info.get("volume", 0)
                     
+            except TypeError as te:
+                if "datetime" in str(te) and "str" in str(te):
+                    self._logger.warning(f"YFinance cache corruption for {symbol}, skipping info lookup")
+                else:
+                    self._logger.warning(f"Failed to get info for {symbol}: {te}")
             except Exception as e:
                 self._logger.warning(f"Failed to get info for {symbol}: {e}")
             
@@ -359,6 +381,10 @@ class YFinanceProvider(DataProviderPlugin, IDataProvider):
                 price = info.get("regularMarketPrice")
                 if price is not None:
                     return float(price)
+            except TypeError as te:
+                if "datetime" in str(te) and "str" in str(te):
+                    self._logger.debug(f"YFinance cache corruption for {symbol}, skipping info lookup")
+                pass
             except:
                 pass
             
@@ -464,8 +490,20 @@ class YFinanceProvider(DataProviderPlugin, IDataProvider):
         try:
             yf_symbol = self._map_symbol(symbol)
             ticker = yf.Ticker(yf_symbol)
-            info = ticker.info
-            return info.get('regularMarketPrice') is not None or info.get('currentPrice') is not None
+            
+            # Try to get info first
+            try:
+                info = ticker.info
+                return info.get('regularMarketPrice') is not None or info.get('currentPrice') is not None
+            except TypeError as te:
+                if "datetime" in str(te) and "str" in str(te):
+                    self._logger.debug(f"YFinance cache corruption for {symbol}, using history for validation")
+                    # Use history as fallback validation
+                    hist = ticker.history(period="1d")
+                    return not hist.empty
+                else:
+                    raise te
+                    
         except Exception as e:
             self._logger.warning(f"Symbol validation failed for {symbol}: {e}")
             return False

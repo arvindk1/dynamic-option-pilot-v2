@@ -3,46 +3,85 @@
   "strategy_name": "Credit Spread",
   "strategy_type": "CREDIT_SPREAD",
   "description": "Income generation through credit spreads with defined risk and high probability of profit",
-  
   "universe": {
-    "symbol_types": ["STOCK", "ETF"],
+    "symbol_types": [
+      "STOCK",
+      "ETF"
+    ],
     "min_market_cap": 5000000000,
     "min_avg_volume": 2000000,
     "min_option_volume": 500,
     "liquid_underlyings_only": true
   },
-  
   "position_parameters": {
-    "delta_targets": [0.05, 0.10, 0.15, 0.20],
+    "delta_targets": [
+      0.05,
+      0.1,
+      0.15,
+      0.2
+    ],
     "min_dte": 14,
     "max_dte": 45,
     "min_credit": 0.05,
-    "preferred_strikes": [5, 10],
+    "preferred_strikes": [
+      5,
+      10
+    ],
     "expiration_limit": 4,
     "max_opportunities": 6
   },
-  
   "strike_selection": {
     "strike_spacing_rules": [
-      { "price_lt": 50,   "spacing": 2.5 },
-      { "price_lt": 100,  "spacing": 5   },
-      { "price_lt": 200,  "spacing": 5   },
-      { "price_lt": 1000, "spacing": 10  },
-      { "default": 25 }
+      {
+        "price_lt": 50,
+        "spacing": 2.5
+      },
+      {
+        "price_lt": 100,
+        "spacing": 5
+      },
+      {
+        "price_lt": 200,
+        "spacing": 5
+      },
+      {
+        "price_lt": 1000,
+        "spacing": 10
+      },
+      {
+        "default": 25
+      }
     ],
-    "spread_widths": [5, 10, 15, 20],
-    "min_credit_to_width_ratio": 0.20
+    "spread_widths": [
+      5,
+      10,
+      15,
+      20
+    ],
+    "min_credit_to_width_ratio": 0.2
   },
-  
   "entry_signals": {
-    "allowed_bias": ["BULLISH", "NEUTRAL", "BEARISH"],
-    "allowed_strength": ["MODERATE", "STRONG", "WEAK"],
-    "allowed_volatility": ["NORMAL", "HIGH"],
+    "allowed_bias": [
+      "BULLISH",
+      "NEUTRAL",
+      "BEARISH"
+    ],
+    "allowed_strength": [
+      "MODERATE",
+      "STRONG",
+      "WEAK"
+    ],
+    "allowed_volatility": [
+      "NORMAL",
+      "HIGH"
+    ],
     "forbidden_combinations": [
-      { "bias": "NEUTRAL", "volatility": "HIGH" }
+      {
+        "bias": "NEUTRAL",
+        "volatility": "HIGH"
+      }
     ]
   },
-  
   "scoring": {
     "probability_weight": 3.0,
     "ev_multiplier": 10.0,
@@ -50,51 +89,479 @@
     "risk_reward_cap": 2.0,
     "time_decay_weight": 1.0,
     "signal_strength_multiplier": {
-      "STRONG":   1.2,
+      "STRONG": 1.2,
       "MODERATE": 1.0,
-      "WEAK":     0.8
+      "WEAK": 0.8
     },
     "volatility_multiplier": {
-      "HIGH":   1.1,
+      "HIGH": 1.1,
       "NORMAL": 1.0,
-      "LOW":    0.9
+      "LOW": 0.9
     },
     "score_floor": 1.0,
     "score_ceiling": 10.0,
     "round_decimals": 1
   },
-  
   "risk_management": {
     "max_allocation_percentage": 25,
     "max_single_position_size": 5,
     "correlation_limit": 0.8,
     "sector_concentration_limit": 0.4
   },
-  
   "exit_rules": {
     "profit_targets": [
-      { "level": 0.25, "action": "CLOSE_HALF", "percentage": 0.5, "priority": 75 },
-      { "level": 0.50, "action": "CLOSE_ALL", "percentage": 1.0, "priority": 85 }
+      {
+        "level": 0.25,
+        "action": "CLOSE_HALF",
+        "percentage": 0.5,
+        "priority": 75
+      },
+      {
+        "level": 0.5,
+        "action": "CLOSE_ALL",
+        "percentage": 1.0,
+        "priority": 85
+      }
     ],
     "stop_loss_rules": [
-      { "type": "PERCENTAGE", "trigger": -2.0, "action": "CLOSE_ALL", "priority": 100 }
+      {
+        "type": "PERCENTAGE",
+        "trigger": -2.0,
+        "action": "CLOSE_ALL",
+        "priority": 100
+      }
     ],
     "time_exits": [
-      { "condition": "dte_less_than", "value": 7, "action": "CLOSE_ALL", "priority": 90 }
+      {
+        "condition": "dte_less_than",
+        "value": 7,
+        "action": "CLOSE_ALL",
+        "priority": 90
+      }
     ],
     "delta_management": [
-      { "condition": "delta_breach", "threshold": 0.30, "action": "CLOSE_ALL", "priority": 95 }
+      {
+        "condition": "delta_breach",
+        "threshold": 0.3,
+        "action": "CLOSE_ALL",
+        "priority": 95
+      }
     ]
   },
-  
   "educational_content": {
     "best_for": "Income generation with defined risk",
     "when_to_use": "Neutral to mildly directional markets with elevated volatility",
     "profit_mechanism": "Collect premium and benefit from time decay",
-    "risk_profile": "Medium – limited defined risk",
-    "duration_days": [14, 45],
+    "risk_profile": "Medium \u2013 limited defined risk",
+    "duration_days": [
+      14,
+      45
+    ],
     "max_profit": "Premium collected",
     "max_loss": "Spread width minus premium collected",
     "breakeven": "Short strike +/- premium collected"
+  },
+  "ui_metadata": {
+    "sections": [
+      {
+        "id": "position_parameters",
+        "title": "Position Parameters",
+        "description": "Core position sizing and timing parameters",
+        "fields": [
+          {
+            "key": "position_parameters.delta_targets",
+            "label": "Delta Targets",
+            "description": "Target deltas",
+            "type": "text",
+            "default": "[0.05, 0.1, 0.15, 0.2]"
+          },
+          {
+            "key": "position_parameters.min_dte",
+            "label": "Min Dte",
+            "description": "Minimum days to expiration",
+            "type": "number",
+            "default": 14,
+            "min": 1,
+            "max": 120,
+            "step": 1
+          },
+          {
+            "key": "position_parameters.max_dte",
+            "label": "Max Dte",
+            "description": "Maximum days to expiration",
+            "type": "number",
+            "default": 45,
+            "min": 1,
+            "max": 120,
+            "step": 1
+          },
+          {
+            "key": "position_parameters.min_credit",
+            "label": "Min Credit",
+            "description": "Minimum credit",
+            "type": "slider",
+            "default": 0.05,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          },
+          {
+            "key": "position_parameters.preferred_strikes",
+            "label": "Preferred Strikes",
+            "description": "Preferred Strikes parameter",
+            "type": "range",
+            "min": -5,
+            "max": 30,
+            "step": 1,
+            "default": [
+              5,
+              10
+            ]
+          },
+          {
+            "key": "position_parameters.expiration_limit",
+            "label": "Expiration Limit",
+            "description": "Expiration Limit parameter",
+            "type": "number",
+            "default": 4,
+            "min": 1,
+            "max": 100,
+            "step": 1,
+            "format": "percentage"
+          },
+          {
+            "key": "position_parameters.max_opportunities",
+            "label": "Max Opportunities",
+            "description": "Maximum number of opportunities to find",
+            "type": "number",
+            "default": 6,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          }
+        ]
+      },
+      {
+        "id": "entry_signals",
+        "title": "Entry Signals",
+        "description": "Conditions for entering new positions",
+        "fields": [
+          {
+            "key": "entry_signals.allowed_bias",
+            "label": "Allowed Bias",
+            "description": "Allowed Bias parameter",
+            "type": "multiselect",
+            "options": [
+              "BULLISH",
+              "NEUTRAL",
+              "BEARISH"
+            ],
+            "default": [
+              "BULLISH",
+              "NEUTRAL",
+              "BEARISH"
+            ]
+          },
+          {
+            "key": "entry_signals.allowed_strength",
+            "label": "Allowed Strength",
+            "description": "Allowed Strength parameter",
+            "type": "multiselect",
+            "options": [
+              "MODERATE",
+              "STRONG",
+              "WEAK"
+            ],
+            "default": [
+              "MODERATE",
+              "STRONG",
+              "WEAK"
+            ]
+          },
+          {
+            "key": "entry_signals.allowed_volatility",
+            "label": "Allowed Volatility",
+            "description": "Allowed Volatility parameter",
+            "type": "multiselect",
+            "options": [
+              "NORMAL",
+              "HIGH"
+            ],
+            "default": [
+              "NORMAL",
+              "HIGH"
+            ]
+          },
+          {
+            "key": "entry_signals.forbidden_combinations",
+            "label": "Forbidden Combinations",
+            "description": "Forbidden Combinations parameter",
+            "type": "text",
+            "default": "[{'bias': 'NEUTRAL', 'volatility': 'HIGH'}]"
+          }
+        ]
+      },
+      {
+        "id": "exit_rules",
+        "title": "Exit Rules",
+        "description": "Profit targets, stop losses, and exit conditions",
+        "fields": [
+          {
+            "key": "exit_rules.profit_targets",
+            "label": "Profit Targets",
+            "description": "Target profits",
+            "type": "text",
+            "default": "[{'level': 0.25, 'action': 'CLOSE_HALF', 'percentage': 0.5, 'priority': 75}, {'level': 0.5, 'action': 'CLOSE_ALL', 'percentage': 1.0, 'priority': 85}]"
+          },
+          {
+            "key": "exit_rules.stop_loss_rules",
+            "label": "Stop Loss Rules",
+            "description": "Stop Loss Rules parameter",
+            "type": "text",
+            "default": "[{'type': 'PERCENTAGE', 'trigger': -2.0, 'action': 'CLOSE_ALL', 'priority': 100}]"
+          },
+          {
+            "key": "exit_rules.time_exits",
+            "label": "Time Exits",
+            "description": "Time Exits parameter",
+            "type": "text",
+            "default": "[{'condition': 'dte_less_than', 'value': 7, 'action': 'CLOSE_ALL', 'priority': 90}]"
+          },
+          {
+            "key": "exit_rules.delta_management",
+            "label": "Delta Management",
+            "description": "Delta Management parameter",
+            "type": "text",
+            "default": "[{'condition': 'delta_breach', 'threshold': 0.3, 'action': 'CLOSE_ALL', 'priority': 95}]"
+          }
+        ]
+      },
+      {
+        "id": "risk_management",
+        "title": "Risk Management",
+        "description": "Portfolio-level risk controls and limits",
+        "fields": [
+          {
+            "key": "risk_management.max_allocation_percentage",
+            "label": "Max Allocation Percentage",
+            "description": "Maximum allocation percentage",
+            "type": "number",
+            "default": 25,
+            "min": 1,
+            "max": 100,
+            "step": 1,
+            "format": "percentage"
+          },
+          {
+            "key": "risk_management.max_single_position_size",
+            "label": "Max Single Position Size",
+            "description": "Maximum single position size",
+            "type": "number",
+            "default": 5,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          },
+          {
+            "key": "risk_management.correlation_limit",
+            "label": "Correlation Limit",
+            "description": "Correlation Limit parameter",
+            "type": "slider",
+            "default": 0.8,
+            "min": 0.08000000000000002,
+            "max": 4.0,
+            "step": 0.01
+          },
+          {
+            "key": "risk_management.sector_concentration_limit",
+            "label": "Sector Concentration Limit",
+            "description": "Sector Concentration Limit parameter",
+            "type": "slider",
+            "default": 0.4,
+            "min": 0.01,
+            "max": 1.0,
+            "step": 0.01,
+            "format": "percentage"
+          }
+        ]
+      },
+      {
+        "id": "strike_selection",
+        "title": "Strike Selection",
+        "description": "How to select optimal strike prices",
+        "fields": [
+          {
+            "key": "strike_selection.strike_spacing_rules",
+            "label": "Strike Spacing Rules",
+            "description": "Strike Spacing Rules parameter",
+            "type": "text",
+            "default": "[{'price_lt': 50, 'spacing': 2.5}, {'price_lt': 100, 'spacing': 5}, {'price_lt': 200, 'spacing': 5}, {'price_lt': 1000, 'spacing': 10}, {'default': 25}]"
+          },
+          {
+            "key": "strike_selection.spread_widths",
+            "label": "Spread Widths",
+            "description": "Spread Widths parameter",
+            "type": "text",
+            "default": "[5, 10, 15, 20]"
+          },
+          {
+            "key": "strike_selection.min_credit_to_width_ratio",
+            "label": "Min Credit To Width Ratio",
+            "description": "Minimum credit to width ratio",
+            "type": "slider",
+            "default": 0.2,
+            "min": 0.01,
+            "max": 1.0,
+            "step": 0.01,
+            "format": "percentage"
+          }
+        ]
+      },
+      {
+        "id": "scoring",
+        "title": "Scoring Parameters",
+        "description": "Opportunity scoring weights and criteria",
+        "fields": [
+          {
+            "key": "scoring.probability_weight",
+            "label": "Probability Weight",
+            "description": "Probability Weight parameter",
+            "type": "slider",
+            "default": 3.0,
+            "min": 0.30000000000000004,
+            "max": 15.0,
+            "step": 0.01
+          },
+          {
+            "key": "scoring.ev_multiplier",
+            "label": "Ev Multiplier",
+            "description": "Ev Multiplier parameter",
+            "type": "slider",
+            "default": 10.0,
+            "min": 1.0,
+            "max": 50.0,
+            "step": 0.01
+          },
+          {
+            "key": "scoring.risk_reward_multiplier",
+            "label": "Risk Reward Multiplier",
+            "description": "Risk Reward Multiplier parameter",
+            "type": "slider",
+            "default": 4.0,
+            "min": 0.4,
+            "max": 20.0,
+            "step": 0.01
+          },
+          {
+            "key": "scoring.risk_reward_cap",
+            "label": "Risk Reward Cap",
+            "description": "Risk Reward Cap parameter",
+            "type": "slider",
+            "default": 2.0,
+            "min": 0.2,
+            "max": 10.0,
+            "step": 0.01
+          },
+          {
+            "key": "scoring.time_decay_weight",
+            "label": "Time Decay Weight",
+            "description": "Time Decay Weight parameter",
+            "type": "slider",
+            "default": 1.0,
+            "min": 0.1,
+            "max": 5.0,
+            "step": 0.01
+          },
+          {
+            "key": "scoring.score_floor",
+            "label": "Score Floor",
+            "description": "Score Floor parameter",
+            "type": "slider",
+            "default": 1.0,
+            "min": 0.1,
+            "max": 5.0,
+            "step": 0.01
+          },
+          {
+            "key": "scoring.score_ceiling",
+            "label": "Score Ceiling",
+            "description": "Score Ceiling parameter",
+            "type": "slider",
+            "default": 10.0,
+            "min": 1.0,
+            "max": 50.0,
+            "step": 0.01
+          },
+          {
+            "key": "scoring.round_decimals",
+            "label": "Round Decimals",
+            "description": "Round Decimals parameter",
+            "type": "number",
+            "default": 1,
+            "min": 1,
+            "max": 3,
+            "step": 1
+          }
+        ]
+      },
+      {
+        "id": "universe",
+        "title": "Trading Universe",
+        "description": "Symbol selection and filtering criteria",
+        "fields": [
+          {
+            "key": "universe.symbol_types",
+            "label": "Symbol Types",
+            "description": "Symbol Types parameter",
+            "type": "multiselect",
+            "options": [
+              "STOCK",
+              "ETF"
+            ],
+            "default": [
+              "STOCK",
+              "ETF"
+            ]
+          },
+          {
+            "key": "universe.min_market_cap",
+            "label": "Min Market Cap",
+            "description": "Minimum market cap",
+            "type": "number",
+            "default": 5000000000,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          },
+          {
+            "key": "universe.min_avg_volume",
+            "label": "Min Avg Volume",
+            "description": "Minimum avg volume",
+            "type": "number",
+            "default": 2000000,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          },
+          {
+            "key": "universe.min_option_volume",
+            "label": "Min Option Volume",
+            "description": "Minimum option volume",
+            "type": "number",
+            "default": 500,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          },
+          {
+            "key": "universe.liquid_underlyings_only",
+            "label": "Liquid Underlyings Only",
+            "description": "Liquid Underlyings Only parameter",
+            "type": "toggle",
+            "default": true
+          }
+        ]
+      }
+    ]
   }
 }

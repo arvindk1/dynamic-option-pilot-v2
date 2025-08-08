@@ -466,6 +466,7 @@ class JSONStrategyPlugin(BaseStrategyPlugin):
                 symbol=symbol,
                 strategy_type=strategy_type,
                 strategy_id=self.json_config.strategy_id,
+                universe=config.get('universe', {}).get('universe_name', 'default'),  # CRITICAL FIX: Add universe attribute
                 underlying_price=quote.price,
                 
                 # Option details - handle Protective Put specially

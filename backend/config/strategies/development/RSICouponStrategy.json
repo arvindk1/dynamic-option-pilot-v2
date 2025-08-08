@@ -3,7 +3,6 @@
   "strategy_name": "RSI Coupon Strategy",
   "strategy_type": "RSI_COUPON",
   "description": "Funnel: screen oversold equities (RSI) + sentiment filter, then overlay high-probability options plays",
-  
   "universe": {
     "symbol_for_full_universe": "SPY",
     "max_universe_symbols": 10,
@@ -11,56 +10,76 @@
     "min_avg_volume": 1000000,
     "exclude_earnings_days": 3
   },
-  
   "technical_indicators": {
-    "rsi_thresholds": { 
-      "min_rsi": 30, 
-      "max_rsi": 45 
+    "rsi_thresholds": {
+      "min_rsi": 30,
+      "max_rsi": 45
     },
     "rsi_period": 14,
     "additional_filters": {
-      "bollinger_position": { "max": 0.3 },
-      "volume_ratio": { "min": 1.2 }
+      "bollinger_position": {
+        "max": 0.3
+      },
+      "volume_ratio": {
+        "min": 1.2
+      }
     }
   },
-  
   "position_parameters": {
-    "target_dtes": [20, 30, 45],
+    "target_dtes": [
+      20,
+      30,
+      45
+    ],
     "max_opportunities": 5,
-    "preferred_delta_range": [0.25, 0.40],
+    "preferred_delta_range": [
+      0.25,
+      0.4
+    ],
     "min_probability_profit": 0.65
   },
-  
   "entry_signals": {
     "rsi_below": 45,
-    "allow_bias": ["BULLISH", "NEUTRAL", "SLIGHTLY_BEARISH"],
+    "allow_bias": [
+      "BULLISH",
+      "NEUTRAL",
+      "SLIGHTLY_BEARISH"
+    ],
     "required_oversold_confirmation": true,
     "min_signal_strength": "MODERATE"
   },
-  
   "scoring": {
     "base_probability_weight": 5.0,
     "rsi_bonus": [
-      { "rsi_lt": 25, "bonus": 2.0 },
-      { "rsi_lt": 30, "bonus": 1.5 },
-      { "rsi_lt": 35, "bonus": 1.0 },
-      { "default": 0.5 }
+      {
+        "rsi_lt": 25,
+        "bonus": 2.0
+      },
+      {
+        "rsi_lt": 30,
+        "bonus": 1.5
+      },
+      {
+        "rsi_lt": 35,
+        "bonus": 1.0
+      },
+      {
+        "default": 0.5
+      }
     ],
-    "risk_reward_bonus": { 
-      "multiplier": 0.5, 
-      "cap": 1.5 
+    "risk_reward_bonus": {
+      "multiplier": 0.5,
+      "cap": 1.5
     },
     "score_ceiling": 10.0,
     "score_floor": 2.0,
     "round_decimals": 1
   },
-  
   "trade_setup_mapping": {
     "oversold": "BULLISH_REVERSAL",
     "deeply_oversold": "STRONG_BULLISH_REVERSAL",
     "default": "NEUTRAL"
   },
-  
   "risk_management": {
     "max_allocation_percentage": 20,
     "max_correlation": 0.6,
@@ -73,23 +92,46 @@
       }
     }
   },
-  
   "exit_rules": {
     "profit_targets": [
-      { "level": 0.60, "action": "CLOSE_HALF", "percentage": 0.5, "priority": 80 },
-      { "level": 0.80, "action": "CLOSE_ALL", "percentage": 1.0, "priority": 85 }
+      {
+        "level": 0.6,
+        "action": "CLOSE_HALF",
+        "percentage": 0.5,
+        "priority": 80
+      },
+      {
+        "level": 0.8,
+        "action": "CLOSE_ALL",
+        "percentage": 1.0,
+        "priority": 85
+      }
     ],
     "stop_loss_rules": [
-      { "type": "PERCENTAGE", "trigger": -0.40, "action": "CLOSE_ALL", "priority": 100 }
+      {
+        "type": "PERCENTAGE",
+        "trigger": -0.4,
+        "action": "CLOSE_ALL",
+        "priority": 100
+      }
     ],
     "technical_exits": [
-      { "condition": "rsi_above", "value": 70, "action": "CLOSE_ALL", "priority": 90 }
+      {
+        "condition": "rsi_above",
+        "value": 70,
+        "action": "CLOSE_ALL",
+        "priority": 90
+      }
     ],
     "time_exits": [
-      { "condition": "dte_less_than", "value": 7, "action": "CLOSE_ALL", "priority": 85 }
+      {
+        "condition": "dte_less_than",
+        "value": 7,
+        "action": "CLOSE_ALL",
+        "priority": 85
+      }
     ]
   },
-  
   "educational_content": {
     "best_for": "Mean reversion trades on oversold conditions",
     "when_to_use": "RSI below 45 with additional oversold confirmation",
@@ -98,5 +140,280 @@
     "typical_duration": "20-45 days",
     "max_profit": "Strike price - premium paid (puts) or premium collected (calls)",
     "max_loss": "Premium paid or collected"
+  },
+  "ui_metadata": {
+    "sections": [
+      {
+        "id": "position_parameters",
+        "title": "Position Parameters",
+        "description": "Core position sizing and timing parameters",
+        "fields": [
+          {
+            "key": "position_parameters.target_dtes",
+            "label": "Target Dtes",
+            "description": "Target target dtes",
+            "type": "text",
+            "default": "[20, 30, 45]"
+          },
+          {
+            "key": "position_parameters.max_opportunities",
+            "label": "Max Opportunities",
+            "description": "Maximum number of opportunities to find",
+            "type": "number",
+            "default": 5,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          },
+          {
+            "key": "position_parameters.preferred_delta_range",
+            "label": "Preferred Delta Range",
+            "description": "Preferred Delta Range parameter",
+            "type": "range",
+            "min": -9.75,
+            "max": 20.4,
+            "step": 0.01,
+            "default": [
+              0.25,
+              0.4
+            ]
+          },
+          {
+            "key": "position_parameters.min_probability_profit",
+            "label": "Min Probability Profit",
+            "description": "Minimum probability profit",
+            "type": "slider",
+            "default": 0.65,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          }
+        ]
+      },
+      {
+        "id": "entry_signals",
+        "title": "Entry Signals",
+        "description": "Conditions for entering new positions",
+        "fields": [
+          {
+            "key": "entry_signals.rsi_below",
+            "label": "Rsi Below",
+            "description": "Rsi Below parameter",
+            "type": "number",
+            "default": 45,
+            "min": 22,
+            "max": 135,
+            "step": 1
+          },
+          {
+            "key": "entry_signals.allow_bias",
+            "label": "Allow Bias",
+            "description": "Allow Bias parameter",
+            "type": "multiselect",
+            "options": [
+              "BULLISH",
+              "NEUTRAL",
+              "SLIGHTLY_BEARISH"
+            ],
+            "default": [
+              "BULLISH",
+              "NEUTRAL",
+              "SLIGHTLY_BEARISH"
+            ]
+          },
+          {
+            "key": "entry_signals.required_oversold_confirmation",
+            "label": "Required Oversold Confirmation",
+            "description": "Required Oversold Confirmation parameter",
+            "type": "toggle",
+            "default": true
+          },
+          {
+            "key": "entry_signals.min_signal_strength",
+            "label": "Min Signal Strength",
+            "description": "Minimum signal strength",
+            "type": "select",
+            "options": [
+              "MODERATE"
+            ],
+            "default": "MODERATE"
+          }
+        ]
+      },
+      {
+        "id": "exit_rules",
+        "title": "Exit Rules",
+        "description": "Profit targets, stop losses, and exit conditions",
+        "fields": [
+          {
+            "key": "exit_rules.profit_targets",
+            "label": "Profit Targets",
+            "description": "Target profits",
+            "type": "text",
+            "default": "[{'level': 0.6, 'action': 'CLOSE_HALF', 'percentage': 0.5, 'priority': 80}, {'level': 0.8, 'action': 'CLOSE_ALL', 'percentage': 1.0, 'priority': 85}]"
+          },
+          {
+            "key": "exit_rules.stop_loss_rules",
+            "label": "Stop Loss Rules",
+            "description": "Stop Loss Rules parameter",
+            "type": "text",
+            "default": "[{'type': 'PERCENTAGE', 'trigger': -0.4, 'action': 'CLOSE_ALL', 'priority': 100}]"
+          },
+          {
+            "key": "exit_rules.technical_exits",
+            "label": "Technical Exits",
+            "description": "Technical Exits parameter",
+            "type": "text",
+            "default": "[{'condition': 'rsi_above', 'value': 70, 'action': 'CLOSE_ALL', 'priority': 90}]"
+          },
+          {
+            "key": "exit_rules.time_exits",
+            "label": "Time Exits",
+            "description": "Time Exits parameter",
+            "type": "text",
+            "default": "[{'condition': 'dte_less_than', 'value': 7, 'action': 'CLOSE_ALL', 'priority': 85}]"
+          }
+        ]
+      },
+      {
+        "id": "risk_management",
+        "title": "Risk Management",
+        "description": "Portfolio-level risk controls and limits",
+        "fields": [
+          {
+            "key": "risk_management.max_allocation_percentage",
+            "label": "Max Allocation Percentage",
+            "description": "Maximum allocation percentage",
+            "type": "number",
+            "default": 20,
+            "min": 1,
+            "max": 100,
+            "step": 1,
+            "format": "percentage"
+          },
+          {
+            "key": "risk_management.max_correlation",
+            "label": "Max Correlation",
+            "description": "Maximum correlation",
+            "type": "slider",
+            "default": 0.6,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          }
+        ]
+      },
+      {
+        "id": "scoring",
+        "title": "Scoring Parameters",
+        "description": "Opportunity scoring weights and criteria",
+        "fields": [
+          {
+            "key": "scoring.base_probability_weight",
+            "label": "Base Probability Weight",
+            "description": "Base Probability Weight parameter",
+            "type": "slider",
+            "default": 5.0,
+            "min": 0.5,
+            "max": 25.0,
+            "step": 0.01
+          },
+          {
+            "key": "scoring.rsi_bonus",
+            "label": "Rsi Bonus",
+            "description": "Rsi Bonus parameter",
+            "type": "text",
+            "default": "[{'rsi_lt': 25, 'bonus': 2.0}, {'rsi_lt': 30, 'bonus': 1.5}, {'rsi_lt': 35, 'bonus': 1.0}, {'default': 0.5}]"
+          },
+          {
+            "key": "scoring.score_ceiling",
+            "label": "Score Ceiling",
+            "description": "Score Ceiling parameter",
+            "type": "slider",
+            "default": 10.0,
+            "min": 1.0,
+            "max": 50.0,
+            "step": 0.01
+          },
+          {
+            "key": "scoring.score_floor",
+            "label": "Score Floor",
+            "description": "Score Floor parameter",
+            "type": "slider",
+            "default": 2.0,
+            "min": 0.2,
+            "max": 10.0,
+            "step": 0.01
+          },
+          {
+            "key": "scoring.round_decimals",
+            "label": "Round Decimals",
+            "description": "Round Decimals parameter",
+            "type": "number",
+            "default": 1,
+            "min": 1,
+            "max": 3,
+            "step": 1
+          }
+        ]
+      },
+      {
+        "id": "universe",
+        "title": "Trading Universe",
+        "description": "Symbol selection and filtering criteria",
+        "fields": [
+          {
+            "key": "universe.symbol_for_full_universe",
+            "label": "Symbol For Full Universe",
+            "description": "Symbol For Full Universe parameter",
+            "type": "select",
+            "options": [
+              "SPY"
+            ],
+            "default": "SPY"
+          },
+          {
+            "key": "universe.max_universe_symbols",
+            "label": "Max Universe Symbols",
+            "description": "Maximum universe symbols",
+            "type": "number",
+            "default": 10,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          },
+          {
+            "key": "universe.min_market_cap",
+            "label": "Min Market Cap",
+            "description": "Minimum market cap",
+            "type": "number",
+            "default": 1000000000,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          },
+          {
+            "key": "universe.min_avg_volume",
+            "label": "Min Avg Volume",
+            "description": "Minimum avg volume",
+            "type": "number",
+            "default": 1000000,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          },
+          {
+            "key": "universe.exclude_earnings_days",
+            "label": "Exclude Earnings Days",
+            "description": "Exclude Earnings Days parameter",
+            "type": "number",
+            "default": 3,
+            "min": 1,
+            "max": 9,
+            "step": 1
+          }
+        ]
+      }
+    ]
   }
 }

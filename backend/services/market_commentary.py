@@ -9,6 +9,7 @@ import random
 from enum import Enum
 
 from utils.universe_loader import get_universe_loader
+from services.real_time_vix import get_vix_service
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +22,7 @@ class MarketSession(Enum):
 class MarketCommentaryService:
     def __init__(self):
         self.universe_loader = get_universe_loader()
+        self.vix_service = get_vix_service()
         self._cache = {}
         self._cache_timestamp = None
         self._cache_duration = timedelta(minutes=30)  # Cache for 30 minutes
@@ -153,13 +155,16 @@ class MarketCommentaryService:
         session = self.get_current_market_session()
         session_content = self.generate_session_specific_content(session)
         
+        # Get real-time VIX data
+        vix_data = self.get_real_time_vix_data()
+        
         commentary = {
             "date": current_date.strftime("%Y-%m-%d"),
             "display_date": current_date.strftime("%A, %B %d, %Y"),
             "timestamp": current_timestamp,
             "market_session": session.value,
-            "data_state": "demo",  # Mark as demo until real data integration
-            "warning": "🚨 DEMO MODE - Connect real market data for live commentary",
+            "data_state": "live" if vix_data.get("data_quality") == "live" else "demo",
+            "warning": None if vix_data.get("data_quality") == "live" else "🚨 DEMO MODE - VIX data integration in progress",
             
             # Dynamic content based on session
             "headline": session_content["headline"],
@@ -171,8 +176,8 @@ class MarketCommentaryService:
             # Session-specific technical outlook
             "technical_outlook": f"SPY trading patterns suggest {session_content['session_focus'].lower()}. Current session: {session_content['key_timing']}",
             
-            # Volatility analysis
-            "volatility_watch": f"VIX levels during {session.value.replace('_', ' ')} showing market sentiment. Watch for {session_content['session_focus'].lower()}.",
+            # Real-time volatility analysis
+            "volatility_watch": vix_data["professional_context"] + f" {vix_data['trading_implication']}",
             
             # Trading implications based on session
             "trading_implications": self._get_session_trading_implications(session),
@@ -294,6 +299,22 @@ class MarketCommentaryService:
                 next_update += timedelta(days=1)
         
         return next_update.isoformat() + "Z"
+    
+    def get_real_time_vix_data(self) -> Dict[str, Any]:
+        """Get real-time VIX data for commentary."""
+        try:
+            return self.vix_service.get_vix_data()
+        except Exception as e:
+            logger.error(f"Error getting VIX data: {e}")
+            return {
+                "current": 18.5,
+                "daily_change": 0.0,
+                "change_percent": 0.0,
+                "regime": "Normal Volatility",
+                "trading_implication": "VIX data temporarily unavailable",
+                "professional_context": "VIX data integration in progress",
+                "data_quality": "fallback"
+            }
 
 # Global instance
 _market_commentary_service = None

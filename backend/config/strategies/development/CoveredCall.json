@@ -3,60 +3,61 @@
   "strategy_name": "Covered Call",
   "strategy_type": "COVERED_CALL",
   "description": "Own 100 shares and sell 1 call against it for income generation with limited upside",
-  
   "universe": {
-    "symbol_types": ["STOCK", "ETF"],
+    "symbol_types": [
+      "STOCK",
+      "ETF"
+    ],
     "min_market_cap": 1000000000,
     "min_avg_volume": 1000000,
     "min_option_volume": 500,
     "dividend_paying_preferred": true,
     "exclude_high_volatility": true
   },
-  
   "position_parameters": {
     "shares_per_contract": 100,
-    "max_position_pct_equity": 0.10,
+    "max_position_pct_equity": 0.1,
     "min_expected_return": 0.02,
-    "max_volatility": 0.30
+    "max_volatility": 0.3
   },
-  
   "entry_signals": {
-    "allowed_bias": ["NEUTRAL", "MILDLY_BULLISH"],
+    "allowed_bias": [
+      "NEUTRAL",
+      "MILDLY_BULLISH"
+    ],
     "min_expected_return": 0.02,
-    "max_volatility": 0.30,
+    "max_volatility": 0.3,
     "min_stock_ownership_days": 30
   },
-  
   "strike_selection": {
     "premium_target_pct": 0.02,
-    "delta_max": 0.30,
+    "delta_max": 0.3,
     "preferred_moneyness": "OTM",
-    "min_time_value": 0.50
+    "min_time_value": 0.5
   },
-  
   "exit_rules": {
     "profit_targets": [
-      { 
-        "level": 0.50, 
-        "action": "ROLL_UP", 
+      {
+        "level": 0.5,
+        "action": "ROLL_UP",
         "priority": 90,
         "description": "Roll up and out when 50% profit achieved"
       }
     ],
     "stop_loss_rules": [
-      { 
-        "type": "PERCENTAGE", 
-        "trigger": -0.20, 
-        "action": "CLOSE_ALL", 
+      {
+        "type": "PERCENTAGE",
+        "trigger": -0.2,
+        "action": "CLOSE_ALL",
         "priority": 100,
         "description": "Close if underlying drops 20%"
       }
     ],
     "time_exits": [
-      { 
-        "condition": "dte_less_than", 
-        "value": 3, 
-        "action": "ROLL_DOWN", 
+      {
+        "condition": "dte_less_than",
+        "value": 3,
+        "action": "ROLL_DOWN",
         "priority": 80,
         "description": "Roll down and out 3 days before expiration"
       }
@@ -70,7 +71,6 @@
       }
     ]
   },
-  
   "scoring": {
     "premium_yield_weight": 0.6,
     "volatility_weight": 0.4,
@@ -80,14 +80,12 @@
     "score_ceiling": 10.0,
     "round_decimals": 1
   },
-  
   "risk_management": {
     "max_allocation_percentage": 40,
     "max_single_position_size": 10,
     "sector_concentration_limit": 0.3,
     "correlation_limit": 0.6
   },
-  
   "educational_content": {
     "best_for": "Conservative income generation on owned stocks",
     "when_to_use": "Neutral to mildly bullish outlook on owned shares",
@@ -97,5 +95,382 @@
     "max_profit": "Call premium + any stock appreciation up to strike",
     "max_loss": "Stock can decline to zero minus call premium collected",
     "assignment_risk": "HIGH - be prepared to sell shares at strike price"
+  },
+  "ui_metadata": {
+    "sections": [
+      {
+        "id": "position_parameters",
+        "title": "Position Parameters",
+        "description": "Core position sizing and timing parameters",
+        "fields": [
+          {
+            "key": "position_parameters.shares_per_contract",
+            "label": "Shares Per Contract",
+            "description": "Shares Per Contract parameter",
+            "type": "number",
+            "default": 100,
+            "min": 50,
+            "max": 300,
+            "step": 1
+          },
+          {
+            "key": "position_parameters.max_position_pct_equity",
+            "label": "Max Position Pct Equity",
+            "description": "Maximum position pct equity",
+            "type": "slider",
+            "default": 0.1,
+            "min": 0.01,
+            "max": 1.0,
+            "step": 0.01,
+            "format": "percentage"
+          },
+          {
+            "key": "position_parameters.min_expected_return",
+            "label": "Min Expected Return",
+            "description": "Minimum expected return",
+            "type": "slider",
+            "default": 0.02,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          },
+          {
+            "key": "position_parameters.max_volatility",
+            "label": "Max Volatility",
+            "description": "Maximum volatility",
+            "type": "slider",
+            "default": 0.3,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          }
+        ]
+      },
+      {
+        "id": "entry_signals",
+        "title": "Entry Signals",
+        "description": "Conditions for entering new positions",
+        "fields": [
+          {
+            "key": "entry_signals.allowed_bias",
+            "label": "Allowed Bias",
+            "description": "Allowed Bias parameter",
+            "type": "multiselect",
+            "options": [
+              "NEUTRAL",
+              "MILDLY_BULLISH"
+            ],
+            "default": [
+              "NEUTRAL",
+              "MILDLY_BULLISH"
+            ]
+          },
+          {
+            "key": "entry_signals.min_expected_return",
+            "label": "Min Expected Return",
+            "description": "Minimum expected return",
+            "type": "slider",
+            "default": 0.02,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          },
+          {
+            "key": "entry_signals.max_volatility",
+            "label": "Max Volatility",
+            "description": "Maximum volatility",
+            "type": "slider",
+            "default": 0.3,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          },
+          {
+            "key": "entry_signals.min_stock_ownership_days",
+            "label": "Min Stock Ownership Days",
+            "description": "Minimum stock ownership days",
+            "type": "number",
+            "default": 30,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          }
+        ]
+      },
+      {
+        "id": "exit_rules",
+        "title": "Exit Rules",
+        "description": "Profit targets, stop losses, and exit conditions",
+        "fields": [
+          {
+            "key": "exit_rules.profit_targets",
+            "label": "Profit Targets",
+            "description": "Target profits",
+            "type": "text",
+            "default": "[{'level': 0.5, 'action': 'ROLL_UP', 'priority': 90, 'description': 'Roll up and out when 50% profit achieved'}]"
+          },
+          {
+            "key": "exit_rules.stop_loss_rules",
+            "label": "Stop Loss Rules",
+            "description": "Stop Loss Rules parameter",
+            "type": "text",
+            "default": "[{'type': 'PERCENTAGE', 'trigger': -0.2, 'action': 'CLOSE_ALL', 'priority': 100, 'description': 'Close if underlying drops 20%'}]"
+          },
+          {
+            "key": "exit_rules.time_exits",
+            "label": "Time Exits",
+            "description": "Time Exits parameter",
+            "type": "text",
+            "default": "[{'condition': 'dte_less_than', 'value': 3, 'action': 'ROLL_DOWN', 'priority': 80, 'description': 'Roll down and out 3 days before expiration'}]"
+          },
+          {
+            "key": "exit_rules.assignment_management",
+            "label": "Assignment Management",
+            "description": "Assignment Management parameter",
+            "type": "text",
+            "default": "[{'condition': 'itm_by_percent', 'threshold': 0.05, 'action': 'PREPARE_ASSIGNMENT', 'priority': 85}]"
+          }
+        ]
+      },
+      {
+        "id": "risk_management",
+        "title": "Risk Management",
+        "description": "Portfolio-level risk controls and limits",
+        "fields": [
+          {
+            "key": "risk_management.max_allocation_percentage",
+            "label": "Max Allocation Percentage",
+            "description": "Maximum allocation percentage",
+            "type": "number",
+            "default": 40,
+            "min": 1,
+            "max": 100,
+            "step": 1,
+            "format": "percentage"
+          },
+          {
+            "key": "risk_management.max_single_position_size",
+            "label": "Max Single Position Size",
+            "description": "Maximum single position size",
+            "type": "number",
+            "default": 10,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          },
+          {
+            "key": "risk_management.sector_concentration_limit",
+            "label": "Sector Concentration Limit",
+            "description": "Sector Concentration Limit parameter",
+            "type": "slider",
+            "default": 0.3,
+            "min": 0.01,
+            "max": 1.0,
+            "step": 0.01,
+            "format": "percentage"
+          },
+          {
+            "key": "risk_management.correlation_limit",
+            "label": "Correlation Limit",
+            "description": "Correlation Limit parameter",
+            "type": "slider",
+            "default": 0.6,
+            "min": 0.06,
+            "max": 3.0,
+            "step": 0.01
+          }
+        ]
+      },
+      {
+        "id": "strike_selection",
+        "title": "Strike Selection",
+        "description": "How to select optimal strike prices",
+        "fields": [
+          {
+            "key": "strike_selection.premium_target_pct",
+            "label": "Premium Target Pct",
+            "description": "Target premium pct",
+            "type": "slider",
+            "default": 0.02,
+            "min": 0.01,
+            "max": 1.0,
+            "step": 0.01,
+            "format": "percentage"
+          },
+          {
+            "key": "strike_selection.delta_max",
+            "label": "Delta Max",
+            "description": "Maximum delta max",
+            "type": "slider",
+            "default": 0.3,
+            "min": 0.05,
+            "max": 0.95,
+            "step": 0.01
+          },
+          {
+            "key": "strike_selection.preferred_moneyness",
+            "label": "Preferred Moneyness",
+            "description": "Preferred Moneyness parameter",
+            "type": "select",
+            "options": [
+              "OTM"
+            ],
+            "default": "OTM"
+          },
+          {
+            "key": "strike_selection.min_time_value",
+            "label": "Min Time Value",
+            "description": "Minimum time value",
+            "type": "slider",
+            "default": 0.5,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          }
+        ]
+      },
+      {
+        "id": "scoring",
+        "title": "Scoring Parameters",
+        "description": "Opportunity scoring weights and criteria",
+        "fields": [
+          {
+            "key": "scoring.premium_yield_weight",
+            "label": "Premium Yield Weight",
+            "description": "Premium Yield Weight parameter",
+            "type": "slider",
+            "default": 0.6,
+            "min": 0.06,
+            "max": 3.0,
+            "step": 0.01
+          },
+          {
+            "key": "scoring.volatility_weight",
+            "label": "Volatility Weight",
+            "description": "Volatility Weight parameter",
+            "type": "slider",
+            "default": 0.4,
+            "min": 0.1,
+            "max": 2.0,
+            "step": 0.05
+          },
+          {
+            "key": "scoring.dividend_bonus",
+            "label": "Dividend Bonus",
+            "description": "Dividend Bonus parameter",
+            "type": "slider",
+            "default": 0.2,
+            "min": 0.020000000000000004,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "scoring.liquidity_weight",
+            "label": "Liquidity Weight",
+            "description": "Liquidity Weight parameter",
+            "type": "slider",
+            "default": 0.3,
+            "min": 0.03,
+            "max": 1.5,
+            "step": 0.01
+          },
+          {
+            "key": "scoring.score_floor",
+            "label": "Score Floor",
+            "description": "Score Floor parameter",
+            "type": "slider",
+            "default": 1.0,
+            "min": 0.1,
+            "max": 5.0,
+            "step": 0.01
+          },
+          {
+            "key": "scoring.score_ceiling",
+            "label": "Score Ceiling",
+            "description": "Score Ceiling parameter",
+            "type": "slider",
+            "default": 10.0,
+            "min": 1.0,
+            "max": 50.0,
+            "step": 0.01
+          },
+          {
+            "key": "scoring.round_decimals",
+            "label": "Round Decimals",
+            "description": "Round Decimals parameter",
+            "type": "number",
+            "default": 1,
+            "min": 1,
+            "max": 3,
+            "step": 1
+          }
+        ]
+      },
+      {
+        "id": "universe",
+        "title": "Trading Universe",
+        "description": "Symbol selection and filtering criteria",
+        "fields": [
+          {
+            "key": "universe.symbol_types",
+            "label": "Symbol Types",
+            "description": "Symbol Types parameter",
+            "type": "multiselect",
+            "options": [
+              "STOCK",
+              "ETF"
+            ],
+            "default": [
+              "STOCK",
+              "ETF"
+            ]
+          },
+          {
+            "key": "universe.min_market_cap",
+            "label": "Min Market Cap",
+            "description": "Minimum market cap",
+            "type": "number",
+            "default": 1000000000,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          },
+          {
+            "key": "universe.min_avg_volume",
+            "label": "Min Avg Volume",
+            "description": "Minimum avg volume",
+            "type": "number",
+            "default": 1000000,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          },
+          {
+            "key": "universe.min_option_volume",
+            "label": "Min Option Volume",
+            "description": "Minimum option volume",
+            "type": "number",
+            "default": 500,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          },
+          {
+            "key": "universe.dividend_paying_preferred",
+            "label": "Dividend Paying Preferred",
+            "description": "Dividend Paying Preferred parameter",
+            "type": "toggle",
+            "default": true
+          },
+          {
+            "key": "universe.exclude_high_volatility",
+            "label": "Exclude High Volatility",
+            "description": "Exclude High Volatility parameter",
+            "type": "toggle",
+            "default": true
+          }
+        ]
+      }
+    ]
   }
 }

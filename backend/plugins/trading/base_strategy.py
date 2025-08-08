@@ -20,6 +20,7 @@ class StrategyOpportunity:
     symbol: str
     strategy_type: str
     strategy_id: str
+    universe: str = "default"  # CRITICAL FIX: Add missing universe attribute for cache system
     
     # Trade structure
     option_type: Optional[str] = None
@@ -199,6 +200,7 @@ class BaseStrategyPlugin(TradingStrategyPlugin):
             symbol=data.get('symbol', ''),
             strategy_type=data.get('strategy_type', ''),
             strategy_id=data.get('strategy_id', self.strategy_config.strategy_id if self.strategy_config else ''),
+            universe=data.get('universe', 'default'),  # CRITICAL FIX: Include universe attribute
             option_type=data.get('option_type'),
             strike=data.get('strike'),
             short_strike=data.get('short_strike'),
@@ -338,7 +340,8 @@ class V1StrategyMigrationMixin:
             symbol=symbol,
             strategy_type=strategy_type,
             strategy_id=getattr(self, 'strategy_config', StrategyConfig('unknown', 'Unknown', 'other')).strategy_id,
-            **kwargs
+            universe=kwargs.get('universe', 'default'),  # CRITICAL FIX: Include universe in V1 migration
+            **{k: v for k, v in kwargs.items() if k != 'universe'}  # Remove universe from kwargs to avoid duplicate
         )
     
     def calculate_theta_decay_score(self, days_to_expiration: int, theta: float) -> float:

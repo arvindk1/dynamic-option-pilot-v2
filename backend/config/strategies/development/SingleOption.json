@@ -3,57 +3,73 @@
   "strategy_name": "Single Option",
   "strategy_type": "NAKED_OPTION",
   "description": "Single leg option trades based on strong directional signals with high premium capture",
-  
   "universe": {
-    "symbol_types": ["STOCK", "ETF"],
+    "symbol_types": [
+      "STOCK",
+      "ETF"
+    ],
     "min_volume": 500000,
     "min_option_volume": 1000,
     "exclude_earnings": true
   },
-  
   "position_parameters": {
-    "delta_targets": [0.30, 0.40, 0.50],
+    "delta_targets": [
+      0.3,
+      0.4,
+      0.5
+    ],
     "min_dte": 7,
     "max_dte": 30,
-    "min_premium": 0.50,
+    "min_premium": 0.5,
     "max_opportunities": 4,
     "expiration_limit": 3,
     "position_size_per_3k": 1
   },
-  
   "strike_selection": {
     "strike_spacing_rules": [
-      { "price_lt": 50,  "spacing": 2.5 },
-      { "price_lt": 200, "spacing": 5   },
-      { "default": 10 }
+      {
+        "price_lt": 50,
+        "spacing": 2.5
+      },
+      {
+        "price_lt": 200,
+        "spacing": 5
+      },
+      {
+        "default": 10
+      }
     ]
   },
-  
   "entry_signals": {
-    "required_signal_strength": ["STRONG"],
-    "forbidden_bias": ["NEUTRAL"],
-    "allowed_bias": ["BULLISH", "BEARISH"],
+    "required_signal_strength": [
+      "STRONG"
+    ],
+    "forbidden_bias": [
+      "NEUTRAL"
+    ],
+    "allowed_bias": [
+      "BULLISH",
+      "BEARISH"
+    ],
     "min_conviction_score": 7.0
   },
-  
   "scoring": {
-    "signal_strength_weights": { 
-      "STRONG": 4.0, 
-      "MODERATE": 2.0, 
-      "WEAK": 0.5 
+    "signal_strength_weights": {
+      "STRONG": 4.0,
+      "MODERATE": 2.0,
+      "WEAK": 0.5
     },
     "ev_multiplier": 2.0,
     "prob_multiplier": 2.0,
-    "volatility_bonus": { 
-      "HIGH": 1.0, 
-      "NORMAL": 0.5, 
-      "LOW": 0.0 
+    "volatility_bonus": {
+      "HIGH": 1.0,
+      "NORMAL": 0.5,
+      "LOW": 0.0
     },
     "score_floor": 1.0,
     "score_ceiling": 10.0,
     "round_decimals": 1
   },
-  
   "risk_management": {
     "risk_level": "HIGH",
     "max_allocation_percentage": 10,
@@ -61,19 +77,32 @@
     "profit_target_percentage": 75,
     "max_single_position_risk": 500
   },
-  
   "exit_rules": {
     "profit_targets": [
-      { "level": 0.75, "action": "CLOSE_ALL", "percentage": 1.0, "priority": 85 }
+      {
+        "level": 0.75,
+        "action": "CLOSE_ALL",
+        "percentage": 1.0,
+        "priority": 85
+      }
     ],
     "stop_loss_rules": [
-      { "type": "PERCENTAGE", "trigger": -0.50, "action": "CLOSE_ALL", "priority": 100 }
+      {
+        "type": "PERCENTAGE",
+        "trigger": -0.5,
+        "action": "CLOSE_ALL",
+        "priority": 100
+      }
     ],
     "time_exits": [
-      { "condition": "dte_less_than", "value": 2, "action": "CLOSE_ALL", "priority": 90 }
+      {
+        "condition": "dte_less_than",
+        "value": 2,
+        "action": "CLOSE_ALL",
+        "priority": 90
+      }
     ]
   },
-  
   "educational_content": {
     "best_for": "High conviction directional trades with significant premium",
     "when_to_use": "Strong technical or fundamental signals with elevated volatility",
@@ -82,5 +111,346 @@
     "typical_duration": "7-30 days",
     "max_profit": "Unlimited (calls) or substantial (puts)",
     "max_loss": "Total premium paid"
+  },
+  "ui_metadata": {
+    "sections": [
+      {
+        "id": "position_parameters",
+        "title": "Position Parameters",
+        "description": "Core position sizing and timing parameters",
+        "fields": [
+          {
+            "key": "position_parameters.delta_targets",
+            "label": "Delta Targets",
+            "description": "Target deltas",
+            "type": "text",
+            "default": "[0.3, 0.4, 0.5]"
+          },
+          {
+            "key": "position_parameters.min_dte",
+            "label": "Min Dte",
+            "description": "Minimum days to expiration",
+            "type": "number",
+            "default": 7,
+            "min": 1,
+            "max": 120,
+            "step": 1
+          },
+          {
+            "key": "position_parameters.max_dte",
+            "label": "Max Dte",
+            "description": "Maximum days to expiration",
+            "type": "number",
+            "default": 30,
+            "min": 1,
+            "max": 120,
+            "step": 1
+          },
+          {
+            "key": "position_parameters.min_premium",
+            "label": "Min Premium",
+            "description": "Minimum premium",
+            "type": "slider",
+            "default": 0.5,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          },
+          {
+            "key": "position_parameters.max_opportunities",
+            "label": "Max Opportunities",
+            "description": "Maximum number of opportunities to find",
+            "type": "number",
+            "default": 4,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          },
+          {
+            "key": "position_parameters.expiration_limit",
+            "label": "Expiration Limit",
+            "description": "Expiration Limit parameter",
+            "type": "number",
+            "default": 3,
+            "min": 1,
+            "max": 100,
+            "step": 1,
+            "format": "percentage"
+          },
+          {
+            "key": "position_parameters.position_size_per_3k",
+            "label": "Position Size Per 3K",
+            "description": "Position Size Per 3K parameter",
+            "type": "number",
+            "default": 1,
+            "min": 1,
+            "max": 3,
+            "step": 1
+          }
+        ]
+      },
+      {
+        "id": "entry_signals",
+        "title": "Entry Signals",
+        "description": "Conditions for entering new positions",
+        "fields": [
+          {
+            "key": "entry_signals.required_signal_strength",
+            "label": "Required Signal Strength",
+            "description": "Required Signal Strength parameter",
+            "type": "multiselect",
+            "options": [
+              "STRONG"
+            ],
+            "default": [
+              "STRONG"
+            ]
+          },
+          {
+            "key": "entry_signals.forbidden_bias",
+            "label": "Forbidden Bias",
+            "description": "Forbidden Bias parameter",
+            "type": "multiselect",
+            "options": [
+              "NEUTRAL"
+            ],
+            "default": [
+              "NEUTRAL"
+            ]
+          },
+          {
+            "key": "entry_signals.allowed_bias",
+            "label": "Allowed Bias",
+            "description": "Allowed Bias parameter",
+            "type": "multiselect",
+            "options": [
+              "BULLISH",
+              "BEARISH"
+            ],
+            "default": [
+              "BULLISH",
+              "BEARISH"
+            ]
+          },
+          {
+            "key": "entry_signals.min_conviction_score",
+            "label": "Min Conviction Score",
+            "description": "Minimum conviction score",
+            "type": "slider",
+            "default": 7.0,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          }
+        ]
+      },
+      {
+        "id": "exit_rules",
+        "title": "Exit Rules",
+        "description": "Profit targets, stop losses, and exit conditions",
+        "fields": [
+          {
+            "key": "exit_rules.profit_targets",
+            "label": "Profit Targets",
+            "description": "Target profits",
+            "type": "text",
+            "default": "[{'level': 0.75, 'action': 'CLOSE_ALL', 'percentage': 1.0, 'priority': 85}]"
+          },
+          {
+            "key": "exit_rules.stop_loss_rules",
+            "label": "Stop Loss Rules",
+            "description": "Stop Loss Rules parameter",
+            "type": "text",
+            "default": "[{'type': 'PERCENTAGE', 'trigger': -0.5, 'action': 'CLOSE_ALL', 'priority': 100}]"
+          },
+          {
+            "key": "exit_rules.time_exits",
+            "label": "Time Exits",
+            "description": "Time Exits parameter",
+            "type": "text",
+            "default": "[{'condition': 'dte_less_than', 'value': 2, 'action': 'CLOSE_ALL', 'priority': 90}]"
+          }
+        ]
+      },
+      {
+        "id": "risk_management",
+        "title": "Risk Management",
+        "description": "Portfolio-level risk controls and limits",
+        "fields": [
+          {
+            "key": "risk_management.risk_level",
+            "label": "Risk Level",
+            "description": "Risk Level parameter",
+            "type": "select",
+            "options": [
+              "HIGH"
+            ],
+            "default": "HIGH"
+          },
+          {
+            "key": "risk_management.max_allocation_percentage",
+            "label": "Max Allocation Percentage",
+            "description": "Maximum allocation percentage",
+            "type": "number",
+            "default": 10,
+            "min": 1,
+            "max": 100,
+            "step": 1,
+            "format": "percentage"
+          },
+          {
+            "key": "risk_management.stop_loss_percentage",
+            "label": "Stop Loss Percentage",
+            "description": "Stop Loss Percentage parameter",
+            "type": "number",
+            "default": 50,
+            "min": 1,
+            "max": 100,
+            "step": 1,
+            "format": "percentage"
+          },
+          {
+            "key": "risk_management.profit_target_percentage",
+            "label": "Profit Target Percentage",
+            "description": "Target profit percentage",
+            "type": "number",
+            "default": 75,
+            "min": 1,
+            "max": 100,
+            "step": 1,
+            "format": "percentage"
+          },
+          {
+            "key": "risk_management.max_single_position_risk",
+            "label": "Max Single Position Risk",
+            "description": "Maximum single position risk",
+            "type": "number",
+            "default": 500,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          }
+        ]
+      },
+      {
+        "id": "strike_selection",
+        "title": "Strike Selection",
+        "description": "How to select optimal strike prices",
+        "fields": [
+          {
+            "key": "strike_selection.strike_spacing_rules",
+            "label": "Strike Spacing Rules",
+            "description": "Strike Spacing Rules parameter",
+            "type": "text",
+            "default": "[{'price_lt': 50, 'spacing': 2.5}, {'price_lt': 200, 'spacing': 5}, {'default': 10}]"
+          }
+        ]
+      },
+      {
+        "id": "scoring",
+        "title": "Scoring Parameters",
+        "description": "Opportunity scoring weights and criteria",
+        "fields": [
+          {
+            "key": "scoring.ev_multiplier",
+            "label": "Ev Multiplier",
+            "description": "Ev Multiplier parameter",
+            "type": "slider",
+            "default": 2.0,
+            "min": 0.2,
+            "max": 10.0,
+            "step": 0.01
+          },
+          {
+            "key": "scoring.prob_multiplier",
+            "label": "Prob Multiplier",
+            "description": "Prob Multiplier parameter",
+            "type": "slider",
+            "default": 2.0,
+            "min": 0.2,
+            "max": 10.0,
+            "step": 0.01
+          },
+          {
+            "key": "scoring.score_floor",
+            "label": "Score Floor",
+            "description": "Score Floor parameter",
+            "type": "slider",
+            "default": 1.0,
+            "min": 0.1,
+            "max": 5.0,
+            "step": 0.01
+          },
+          {
+            "key": "scoring.score_ceiling",
+            "label": "Score Ceiling",
+            "description": "Score Ceiling parameter",
+            "type": "slider",
+            "default": 10.0,
+            "min": 1.0,
+            "max": 50.0,
+            "step": 0.01
+          },
+          {
+            "key": "scoring.round_decimals",
+            "label": "Round Decimals",
+            "description": "Round Decimals parameter",
+            "type": "number",
+            "default": 1,
+            "min": 1,
+            "max": 3,
+            "step": 1
+          }
+        ]
+      },
+      {
+        "id": "universe",
+        "title": "Trading Universe",
+        "description": "Symbol selection and filtering criteria",
+        "fields": [
+          {
+            "key": "universe.symbol_types",
+            "label": "Symbol Types",
+            "description": "Symbol Types parameter",
+            "type": "multiselect",
+            "options": [
+              "STOCK",
+              "ETF"
+            ],
+            "default": [
+              "STOCK",
+              "ETF"
+            ]
+          },
+          {
+            "key": "universe.min_volume",
+            "label": "Min Volume",
+            "description": "Minimum volume",
+            "type": "number",
+            "default": 500000,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          },
+          {
+            "key": "universe.min_option_volume",
+            "label": "Min Option Volume",
+            "description": "Minimum option volume",
+            "type": "number",
+            "default": 1000,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          },
+          {
+            "key": "universe.exclude_earnings",
+            "label": "Exclude Earnings",
+            "description": "Exclude Earnings parameter",
+            "type": "toggle",
+            "default": true
+          }
+        ]
+      }
+    ]
   }
 }

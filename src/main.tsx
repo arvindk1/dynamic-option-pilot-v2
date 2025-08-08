@@ -1,6 +1,7 @@
 import { createRoot } from 'react-dom/client'
 import App from './App.tsx'
 import './index.css'
+import { measurePageLoad } from './utils/performance';
 
 // Suppress known custom element redefinition warnings in development
 const originalError = console.error;
@@ -13,6 +14,9 @@ console.error = (...args: unknown[]) => {
 };
 
 console.log('🚀 main.tsx loading...');
+
+// Initialize performance monitoring
+measurePageLoad();
 
 try {
   const rootElement = document.getElementById("root");

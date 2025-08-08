@@ -39,12 +39,26 @@ interface Trade {
 }
 
 export const TradeManager: React.FC = () => {
+  console.log('🔄 TradeManager component render');
+  
   const [trades, setTrades] = useState<Trade[]>([]);
   const [closingTrade, setClosingTrade] = useState<string | null>(null);
   const [exitPrice, setExitPrice] = useState('');
   const [isSync, setIsSync] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
+  const [lastClick, setLastClick] = useState(0);
   const { toast } = useToast();
+  
+  // Use ref to avoid lastSyncTime dependency churn
+  const lastSyncRef = React.useRef<Date | null>(null);
+  useEffect(() => { lastSyncRef.current = lastSyncTime }, [lastSyncTime]);
+
+  console.log('📊 TradeManager state:', { 
+    tradesCount: trades.length, 
+    isSync, 
+    lastSyncTime: lastSyncTime?.toISOString(), 
+    closingTrade 
+  });
 
   // Sync with best practices: 
   // - On component mount
@@ -52,10 +66,16 @@ export const TradeManager: React.FC = () => {
   // - Every 2 minutes if actively viewing
   // - After any trade action
   const performSync = useCallback(async (showToast: boolean = false) => {
-    if (isSync) return; // Prevent concurrent syncs
+    console.log('🚀 performSync called:', { showToast, isSync, lastSyncTime: lastSyncTime?.toISOString() });
+    
+    if (isSync) {
+      console.log('⏳ performSync blocked - already syncing');
+      return; // Prevent concurrent syncs
+    }
     
     // Client-side rate limiting: don't sync if last sync was less than 10 seconds ago
-    if (lastSyncTime && Date.now() - lastSyncTime.getTime() < 10000) {
+    const last = lastSyncRef.current;
+    if (last && Date.now() - last.getTime() < 10000) {
       console.warn('Client-side rate limit: sync attempted too soon');
       if (showToast) {
         toast({
@@ -68,9 +88,11 @@ export const TradeManager: React.FC = () => {
     }
     
     try {
+      console.log('🔄 Starting sync...');
       setIsSync(true);
       // Sync positions first to update the database with Alpaca data
       const syncResult = await paperTradingService.syncPositions();
+      console.log('✅ Sync result:', syncResult);
       
       // Handle rate limiting gracefully
       if (syncResult.rate_limited) {
@@ -86,8 +108,13 @@ export const TradeManager: React.FC = () => {
       }
       
       // Only reload trades if sync was successful or not rate limited
+      console.log('📥 Loading trades after sync...');
       await paperTradingService.loadTrades();
+      const loadedTrades = paperTradingService.getTrades();
+      console.log('📊 Loaded trades:', loadedTrades.length);
+      setTrades(loadedTrades);
       setLastSyncTime(new Date());
+      console.log('🕒 Updated lastSyncTime:', new Date().toISOString());
       
       if (showToast && syncResult.success) {
         toast({
@@ -107,51 +134,97 @@ export const TradeManager: React.FC = () => {
     } finally {
       setIsSync(false);
     }
-  }, [isSync, toast, lastSyncTime]);
+  }, [isSync, toast]); // ref removes lastSyncTime churn
+  
+  console.log('🔄 performSync useCallback recreated - deps changed:', { isSync, toast });
+
+  // Debounced manual sync to prevent spam clicking
+  const onManualSync = useCallback(() => {
+    const now = Date.now();
+    if (now - lastClick < 1500) return; // 1.5 second debounce
+    setLastClick(now);
+    performSync(true);
+  }, [lastClick, performSync]);
+
+  // Performance optimizations - memoized calculations
+  const now = React.useMemo(() => Date.now(), []); // stable within render
+  
+  const { openCount, closedCount } = React.useMemo(() => {
+    let o = 0, c = 0;
+    for (const t of trades) {
+      if (t.status === 'OPEN') o++;
+      else if (t.status === 'CLOSED') c++;
+    }
+    return { openCount: o, closedCount: c };
+  }, [trades]);
 
   useEffect(() => {
+    console.log('🏁 TradeManager main useEffect triggered');
     const unsubscribe = paperTradingService.subscribe(setTrades);
     
     // Load trades immediately without sync first
+    console.log('📥 Initial trade loading...');
     paperTradingService.loadTrades().then(() => {
-      setTrades(paperTradingService.getTrades());
+      const initialTrades = paperTradingService.getTrades();
+      console.log('📊 Initial trades loaded:', initialTrades.length);
+      setTrades(initialTrades);
       // Then perform sync to get updated data
+      console.log('🚀 Triggering initial sync...');
       performSync(false);
     }).catch(console.error);
     
-    return unsubscribe;
+    return () => {
+      console.log('🧹 TradeManager main useEffect cleanup');
+      unsubscribe();
+    };
   }, [performSync]);
 
   // Sync on visibility change (user returns to tab)
   useEffect(() => {
+    if (typeof document === 'undefined') return; // SSR safety
+    
+    console.log('👁️ TradeManager visibility useEffect triggered');
     const handleVisibilityChange = () => {
+      console.log('👁️ Visibility change detected, hidden:', document.hidden);
       if (!document.hidden && lastSyncTime) {
         const timeSinceLastSync = Date.now() - lastSyncTime.getTime();
+        console.log('⏰ Time since last sync:', timeSinceLastSync, 'ms');
         // Sync if it's been more than 1 minute since last sync
         if (timeSinceLastSync > 60000) {
+          console.log('🚀 Triggering visibility-based sync...');
           performSync(false);
         }
       }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [lastSyncTime, performSync]);
+    return () => {
+      console.log('🧹 TradeManager visibility useEffect cleanup');
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [performSync]);
 
   // Periodic sync every 15 minutes when actively viewing (further reduced frequency)
   useEffect(() => {
+    console.log('⏰ TradeManager periodic sync useEffect triggered');
     const interval = setInterval(() => {
+      console.log('⏰ Periodic sync check triggered');
       if (!document.hidden && lastSyncTime) {
         const timeSinceLastSync = Date.now() - lastSyncTime.getTime();
+        console.log('⏰ Periodic check - time since last sync:', timeSinceLastSync, 'ms');
         // Only sync if it's been more than 10 minutes since last sync
         if (timeSinceLastSync > 600000) { // 10 minutes
+          console.log('🚀 Triggering periodic sync...');
           performSync(false);
         }
       }
     }, 900000); // Check every 15 minutes
 
-    return () => clearInterval(interval);
-  }, [performSync, lastSyncTime]);
+    return () => {
+      console.log('🧹 TradeManager periodic sync useEffect cleanup');
+      clearInterval(interval);
+    };
+  }, [performSync]);
 
   const handleCloseTrade = async (tradeId: string) => {
     const price = parseFloat(exitPrice);
@@ -318,7 +391,7 @@ export const TradeManager: React.FC = () => {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => performSync(true)}
+                onClick={onManualSync}
                 disabled={isSync}
                 className="h-8 w-8 p-0 hover:bg-accent/50"
               >

@@ -3,70 +3,75 @@
   "strategy_name": "Collar",
   "strategy_type": "COLLAR",
   "description": "Own stock, sell a call, buy a put - protective strategy with income generation",
-  
   "universe": {
-    "symbol_types": ["STOCK"],
+    "symbol_types": [
+      "STOCK"
+    ],
     "min_market_cap": 2000000000,
     "min_avg_volume": 1000000,
     "min_option_volume": 500,
     "dividend_paying_preferred": true,
     "owned_stocks_only": true
   },
-  
   "position_parameters": {
     "shares_per_contract": 100,
     "max_cost_pct_equity": 0.02,
-    "min_protection_level": 0.90,
+    "min_protection_level": 0.9,
     "income_target_pct": 0.015
   },
-  
   "entry_signals": {
-    "bias": ["NEUTRAL", "SLIGHTLY_BULLISH"],
+    "bias": [
+      "NEUTRAL",
+      "SLIGHTLY_BULLISH"
+    ],
     "max_cost_pct_equity": 0.02,
     "volatility_protection_needed": true,
     "existing_stock_position_required": true
   },
-  
   "strike_selection": {
-    "call_delta_max": 0.30,
-    "put_delta_target": 0.30,
+    "call_delta_max": 0.3,
+    "put_delta_target": 0.3,
     "collar_width_limits": {
       "min_width": 5,
       "max_width": 25
     },
     "cost_optimization": "MINIMIZE_NET_COST"
   },
-  
   "timing": {
-    "dte_range": [7, 60],
-    "optimal_dte": [30, 45],
+    "dte_range": [
+      7,
+      60
+    ],
+    "optimal_dte": [
+      30,
+      45
+    ],
     "earnings_consideration": "ALLOW",
     "dividend_timing": "OPTIMIZE_FOR_DIVIDENDS"
   },
-  
   "exit_rules": {
     "profit_targets": [
-      { 
-        "level": 0.50, 
-        "action": "CLOSE_PUT", 
+      {
+        "level": 0.5,
+        "action": "CLOSE_PUT",
         "priority": 90,
         "description": "Close put when 50% profit achieved"
       }
     ],
     "stop_loss_rules": [
-      { 
-        "type": "PERCENTAGE", 
-        "trigger": -0.50, 
-        "action": "CLOSE_PUT", 
+      {
+        "type": "PERCENTAGE",
+        "trigger": -0.5,
+        "action": "CLOSE_PUT",
         "priority": 100,
         "description": "Close put at 50% loss"
       }
     ],
     "time_exits": [
-      { 
-        "condition": "dte_less_than", 
-        "value": 3, 
-        "action": "CLOSE_ALL", 
+      {
+        "condition": "dte_less_than",
+        "value": 3,
+        "action": "CLOSE_ALL",
         "priority": 80,
         "description": "Close options 3 days before expiration"
       }
@@ -86,7 +91,6 @@
       }
     ]
   },
-  
   "scoring": {
     "protection_cost_weight": 0.7,
     "income_weight": 0.3,
@@ -101,14 +105,12 @@
     "score_ceiling": 10.0,
     "round_decimals": 1
   },
-  
   "risk_management": {
     "max_allocation_percentage": 30,
     "max_collar_cost": 500,
     "upside_cap_acceptance": 0.15,
-    "downside_protection_minimum": 0.10
+    "downside_protection_minimum": 0.1
   },
-  
   "collar_variations": {
     "zero_cost_collar": {
       "target": true,
@@ -119,11 +121,10 @@
       "protection_priority": "HIGH"
     },
     "income_collar": {
-      "min_credit": 0.50,
+      "min_credit": 0.5,
       "income_priority": "HIGH"
     }
   },
-  
   "educational_content": {
     "best_for": "Protecting long stock positions while generating income",
     "when_to_use": "Neutral to slightly bullish with downside protection needs",
@@ -133,5 +134,355 @@
     "max_profit": "Call strike - stock cost + call premium - put premium + dividends",
     "max_loss": "Stock cost - put strike + put premium - call premium",
     "trade_offs": "Limited upside for downside protection and income"
+  },
+  "ui_metadata": {
+    "sections": [
+      {
+        "id": "position_parameters",
+        "title": "Position Parameters",
+        "description": "Core position sizing and timing parameters",
+        "fields": [
+          {
+            "key": "position_parameters.shares_per_contract",
+            "label": "Shares Per Contract",
+            "description": "Shares Per Contract parameter",
+            "type": "number",
+            "default": 100,
+            "min": 50,
+            "max": 300,
+            "step": 1
+          },
+          {
+            "key": "position_parameters.max_cost_pct_equity",
+            "label": "Max Cost Pct Equity",
+            "description": "Maximum cost pct equity",
+            "type": "slider",
+            "default": 0.02,
+            "min": 0.01,
+            "max": 1.0,
+            "step": 0.01,
+            "format": "percentage"
+          },
+          {
+            "key": "position_parameters.min_protection_level",
+            "label": "Min Protection Level",
+            "description": "Minimum protection level",
+            "type": "slider",
+            "default": 0.9,
+            "min": 0.01,
+            "max": 1.0,
+            "step": 0.01,
+            "format": "percentage"
+          },
+          {
+            "key": "position_parameters.income_target_pct",
+            "label": "Income Target Pct",
+            "description": "Target income pct",
+            "type": "slider",
+            "default": 0.015,
+            "min": 0.01,
+            "max": 1.0,
+            "step": 0.01,
+            "format": "percentage"
+          }
+        ]
+      },
+      {
+        "id": "entry_signals",
+        "title": "Entry Signals",
+        "description": "Conditions for entering new positions",
+        "fields": [
+          {
+            "key": "entry_signals.bias",
+            "label": "Bias",
+            "description": "Bias parameter",
+            "type": "multiselect",
+            "options": [
+              "NEUTRAL",
+              "SLIGHTLY_BULLISH"
+            ],
+            "default": [
+              "NEUTRAL",
+              "SLIGHTLY_BULLISH"
+            ]
+          },
+          {
+            "key": "entry_signals.max_cost_pct_equity",
+            "label": "Max Cost Pct Equity",
+            "description": "Maximum cost pct equity",
+            "type": "slider",
+            "default": 0.02,
+            "min": 0.01,
+            "max": 1.0,
+            "step": 0.01,
+            "format": "percentage"
+          },
+          {
+            "key": "entry_signals.volatility_protection_needed",
+            "label": "Volatility Protection Needed",
+            "description": "Volatility Protection Needed parameter",
+            "type": "toggle",
+            "default": true
+          },
+          {
+            "key": "entry_signals.existing_stock_position_required",
+            "label": "Existing Stock Position Required",
+            "description": "Existing Stock Position Required parameter",
+            "type": "toggle",
+            "default": true
+          }
+        ]
+      },
+      {
+        "id": "exit_rules",
+        "title": "Exit Rules",
+        "description": "Profit targets, stop losses, and exit conditions",
+        "fields": [
+          {
+            "key": "exit_rules.profit_targets",
+            "label": "Profit Targets",
+            "description": "Target profits",
+            "type": "text",
+            "default": "[{'level': 0.5, 'action': 'CLOSE_PUT', 'priority': 90, 'description': 'Close put when 50% profit achieved'}]"
+          },
+          {
+            "key": "exit_rules.stop_loss_rules",
+            "label": "Stop Loss Rules",
+            "description": "Stop Loss Rules parameter",
+            "type": "text",
+            "default": "[{'type': 'PERCENTAGE', 'trigger': -0.5, 'action': 'CLOSE_PUT', 'priority': 100, 'description': 'Close put at 50% loss'}]"
+          },
+          {
+            "key": "exit_rules.time_exits",
+            "label": "Time Exits",
+            "description": "Time Exits parameter",
+            "type": "text",
+            "default": "[{'condition': 'dte_less_than', 'value': 3, 'action': 'CLOSE_ALL', 'priority': 80, 'description': 'Close options 3 days before expiration'}]"
+          },
+          {
+            "key": "exit_rules.assignment_management",
+            "label": "Assignment Management",
+            "description": "Assignment Management parameter",
+            "type": "text",
+            "default": "[{'condition': 'call_assignment_risk', 'action': 'ROLL_CALL_UP', 'priority': 85, 'description': 'Roll call up if assignment likely'}, {'condition': 'put_assignment_opportunity', 'action': 'ACCEPT_ASSIGNMENT', 'priority': 75, 'description': 'Accept put assignment to increase position'}]"
+          }
+        ]
+      },
+      {
+        "id": "risk_management",
+        "title": "Risk Management",
+        "description": "Portfolio-level risk controls and limits",
+        "fields": [
+          {
+            "key": "risk_management.max_allocation_percentage",
+            "label": "Max Allocation Percentage",
+            "description": "Maximum allocation percentage",
+            "type": "number",
+            "default": 30,
+            "min": 1,
+            "max": 100,
+            "step": 1,
+            "format": "percentage"
+          },
+          {
+            "key": "risk_management.max_collar_cost",
+            "label": "Max Collar Cost",
+            "description": "Maximum collar cost",
+            "type": "number",
+            "default": 500,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          },
+          {
+            "key": "risk_management.upside_cap_acceptance",
+            "label": "Upside Cap Acceptance",
+            "description": "Upside Cap Acceptance parameter",
+            "type": "slider",
+            "default": 0.15,
+            "min": 0.015,
+            "max": 0.75,
+            "step": 0.01
+          },
+          {
+            "key": "risk_management.downside_protection_minimum",
+            "label": "Downside Protection Minimum",
+            "description": "Minimum downside protection minimum",
+            "type": "slider",
+            "default": 0.1,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          }
+        ]
+      },
+      {
+        "id": "strike_selection",
+        "title": "Strike Selection",
+        "description": "How to select optimal strike prices",
+        "fields": [
+          {
+            "key": "strike_selection.call_delta_max",
+            "label": "Call Delta Max",
+            "description": "Maximum call delta max",
+            "type": "slider",
+            "default": 0.3,
+            "min": 0.05,
+            "max": 0.95,
+            "step": 0.01
+          },
+          {
+            "key": "strike_selection.put_delta_target",
+            "label": "Put Delta Target",
+            "description": "Target put delta",
+            "type": "slider",
+            "default": 0.3,
+            "min": 0.05,
+            "max": 0.95,
+            "step": 0.01
+          },
+          {
+            "key": "strike_selection.cost_optimization",
+            "label": "Cost Optimization",
+            "description": "Cost Optimization parameter",
+            "type": "select",
+            "options": [
+              "MINIMIZE_NET_COST"
+            ],
+            "default": "MINIMIZE_NET_COST"
+          }
+        ]
+      },
+      {
+        "id": "scoring",
+        "title": "Scoring Parameters",
+        "description": "Opportunity scoring weights and criteria",
+        "fields": [
+          {
+            "key": "scoring.protection_cost_weight",
+            "label": "Protection Cost Weight",
+            "description": "Protection Cost Weight parameter",
+            "type": "slider",
+            "default": 0.7,
+            "min": 0.06999999999999999,
+            "max": 3.5,
+            "step": 0.01
+          },
+          {
+            "key": "scoring.income_weight",
+            "label": "Income Weight",
+            "description": "Income Weight parameter",
+            "type": "slider",
+            "default": 0.3,
+            "min": 0.03,
+            "max": 1.5,
+            "step": 0.01
+          },
+          {
+            "key": "scoring.dividend_capture_bonus",
+            "label": "Dividend Capture Bonus",
+            "description": "Dividend Capture Bonus parameter",
+            "type": "slider",
+            "default": 0.2,
+            "min": 0.020000000000000004,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "scoring.score_floor",
+            "label": "Score Floor",
+            "description": "Score Floor parameter",
+            "type": "slider",
+            "default": 1.0,
+            "min": 0.1,
+            "max": 5.0,
+            "step": 0.01
+          },
+          {
+            "key": "scoring.score_ceiling",
+            "label": "Score Ceiling",
+            "description": "Score Ceiling parameter",
+            "type": "slider",
+            "default": 10.0,
+            "min": 1.0,
+            "max": 50.0,
+            "step": 0.01
+          },
+          {
+            "key": "scoring.round_decimals",
+            "label": "Round Decimals",
+            "description": "Round Decimals parameter",
+            "type": "number",
+            "default": 1,
+            "min": 1,
+            "max": 3,
+            "step": 1
+          }
+        ]
+      },
+      {
+        "id": "universe",
+        "title": "Trading Universe",
+        "description": "Symbol selection and filtering criteria",
+        "fields": [
+          {
+            "key": "universe.symbol_types",
+            "label": "Symbol Types",
+            "description": "Symbol Types parameter",
+            "type": "multiselect",
+            "options": [
+              "STOCK"
+            ],
+            "default": [
+              "STOCK"
+            ]
+          },
+          {
+            "key": "universe.min_market_cap",
+            "label": "Min Market Cap",
+            "description": "Minimum market cap",
+            "type": "number",
+            "default": 2000000000,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          },
+          {
+            "key": "universe.min_avg_volume",
+            "label": "Min Avg Volume",
+            "description": "Minimum avg volume",
+            "type": "number",
+            "default": 1000000,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          },
+          {
+            "key": "universe.min_option_volume",
+            "label": "Min Option Volume",
+            "description": "Minimum option volume",
+            "type": "number",
+            "default": 500,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          },
+          {
+            "key": "universe.dividend_paying_preferred",
+            "label": "Dividend Paying Preferred",
+            "description": "Dividend Paying Preferred parameter",
+            "type": "toggle",
+            "default": true
+          },
+          {
+            "key": "universe.owned_stocks_only",
+            "label": "Owned Stocks Only",
+            "description": "Owned Stocks Only parameter",
+            "type": "toggle",
+            "default": true
+          }
+        ]
+      }
+    ]
   }
 }

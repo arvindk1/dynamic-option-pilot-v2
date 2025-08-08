@@ -1,0 +1,130 @@
+{
+  "module": "strategies.butterfly_plugin",
+  "strategy_name": "Butterfly Spread",
+  "strategy_type": "BUTTERFLY",
+  "description": "Long 1 ITM, short 2 ATM, long 1 OTM (or vice versa) - profit from low volatility and precise price targeting",
+  
+  "universe": {
+    "symbol_types": ["STOCK", "ETF"],
+    "min_market_cap": 10000000000,
+    "min_avg_volume": 5000000,
+    "min_option_volume": 1500,
+    "low_volatility_preferred": true,
+    "stable_underlyings": true
+  },
+  
+  "position_parameters": {
+    "max_net_debit": 0.02,
+    "max_opportunities": 3,
+    "position_size_limit": 1000
+  },
+  
+  "entry_signals": {
+    "bias": "NEUTRAL",
+    "volatility_max": 0.30,
+    "implied_volatility_rank_max": 60,
+    "price_consolidation_required": true
+  },
+  
+  "strike_selection": {
+    "wing_structure": "SYMMETRIC",
+    "strike_spacing_rules": [
+      { "price_lt": 50,  "spacing": 2.5 },
+      { "price_lt": 200, "spacing": 5   },
+      { "default": 10 }
+    ],
+    "center_strike": "ATM",
+    "max_wing_width": 15,
+    "min_wing_width": 5
+  },
+  
+  "timing": {
+    "dte_range": [14, 45],
+    "optimal_dte": [21, 35],
+    "avoid_earnings": true,
+    "avoid_high_volatility_events": true
+  },
+  
+  "exit_rules": {
+    "profit_targets": [
+      { 
+        "level": 0.75, 
+        "action": "CLOSE_CENTER", 
+        "priority": 90,
+        "description": "Close center shorts at 75% profit"
+      },
+      { 
+        "level": 0.50, 
+        "action": "CLOSE_ALL", 
+        "priority": 85,
+        "description": "Close entire butterfly at 50% profit"
+      }
+    ],
+    "stop_loss_rules": [
+      { 
+        "type": "PERCENTAGE", 
+        "trigger": -0.25, 
+        "action": "CLOSE_ALL", 
+        "priority": 100,
+        "description": "Close at 25% of max loss"
+      }
+    ],
+    "time_exits": [
+      { 
+        "condition": "dte_less_than", 
+        "value": 7, 
+        "action": "CLOSE_ALL", 
+        "priority": 80,
+        "description": "Close 7 days before expiration"
+      }
+    ],
+    "volatility_exits": [
+      {
+        "condition": "iv_spike",
+        "threshold": 1.5,
+        "action": "CLOSE_ALL",
+        "priority": 95,
+        "description": "Close if IV spikes 50%"
+      }
+    ]
+  },
+  
+  "scoring": {
+    "profit_zone_weight": 0.5,
+    "cost_weight": 0.5,
+    "volatility_stability_bonus": 0.3,
+    "liquidity_weight": 0.2,
+    "price_positioning_multiplier": {
+      "center_zone": 1.5,
+      "wing_zone": 1.0,
+      "outside_wings": 0.3
+    },
+    "score_floor": 1.0,
+    "score_ceiling": 10.0,
+    "round_decimals": 1
+  },
+  
+  "risk_management": {
+    "max_allocation_percentage": 8,
+    "max_single_butterfly_cost": 1000,
+    "concentration_limit": 2,
+    "volatility_risk_threshold": 0.35
+  },
+  
+  "profit_zone_analysis": {
+    "optimal_zone_width": 0.05,
+    "current_price_proximity_bonus": true,
+    "time_decay_acceleration_zone": 0.03
+  },
+  
+  "educational_content": {
+    "best_for": "Precise price targeting with limited risk and defined profit zone",
+    "when_to_use": "Neutral outlook with expectation of low volatility and range-bound movement",
+    "profit_mechanism": "Maximum profit when underlying closes exactly at center strike",
+    "risk_level": "LOW-MEDIUM",
+    "typical_duration": "21-35 days",
+    "max_profit": "Center strike minus wing strike minus net debit",
+    "max_loss": "Net debit paid (limited risk)",
+    "profit_zone": "Between wing strikes with peak at center strike"
+  }
+}
