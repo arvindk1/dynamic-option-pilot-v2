@@ -115,13 +115,13 @@ export const measurePageLoad = () => {
     const navigation = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming;
     
     const metrics = {
-      dnsLookup: navigation.domainLookupEnd - navigation.domainLookupStart,
-      tcpConnection: navigation.connectEnd - navigation.connectStart,
-      tlsSetup: navigation.secureConnectionStart > 0 ? navigation.connectEnd - navigation.secureConnectionStart : 0,
-      requestResponse: navigation.responseEnd - navigation.requestStart,
-      domProcessing: navigation.domContentLoadedEventEnd - navigation.responseEnd,
-      resourceLoading: navigation.loadEventEnd - navigation.domContentLoadedEventEnd,
-      totalLoadTime: navigation.loadEventEnd
+      dnsLookup: Math.max(0, navigation.domainLookupEnd - navigation.domainLookupStart),
+      tcpConnection: Math.max(0, navigation.connectEnd - navigation.connectStart),
+      tlsSetup: navigation.secureConnectionStart > 0 ? Math.max(0, navigation.connectEnd - navigation.secureConnectionStart) : 0,
+      requestResponse: Math.max(0, navigation.responseEnd - navigation.requestStart),
+      domProcessing: Math.max(0, navigation.domContentLoadedEventEnd - navigation.responseEnd),
+      resourceLoading: Math.max(0, navigation.loadEventEnd - navigation.domContentLoadedEventEnd),
+      totalLoadTime: Math.max(0, navigation.loadEventEnd - navigation.navigationStart)
     };
     
     console.log(`📊 Page Load Metrics:

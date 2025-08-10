@@ -112,6 +112,11 @@ interface TradeCardProps {
 }
 
 import { StrategyDisplay } from './StrategyDisplay';
+import TradeCardHeader from './TradeCardHeader';
+import FactorChips from './FactorChips';
+import RiskRow from './RiskRow';
+import TradeCardActions from './TradeCardActions';
+import { NewTradeCard } from './NewTradeCard';
 
 // Get entry/exit price levels for automated trading
 const getTradingLevels = (trade: TradeOpportunity) => {
@@ -912,7 +917,7 @@ export const ResponsiveTradeCard: React.FC<TradeCardProps> = React.memo(({
   return isMobile ? (
     <CompactTradeCard trade={trade} onExecute={onExecute} isExecuting={isExecuting} />
   ) : (
-    <TradeCard trade={trade} onExecute={onExecute} isExecuting={isExecuting} />
+    <NewTradeCard trade={trade} onExecute={onExecute} isExecuting={isExecuting} />
   );
 });
 

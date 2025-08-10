@@ -21,6 +21,14 @@ export interface OpportunityData {
   market_conditions: Record<string, any>;
 }
 
+interface ScanJob {
+  jobId: string;
+  strategyId: string;
+  strategyName: string;
+  status: 'running' | 'completed' | 'error' | 'cancelled';
+  startedAt: string;
+}
+
 interface StrategyContextType {
   // Strategy metadata
   strategies: StrategyMetadata[];
@@ -32,9 +40,13 @@ interface StrategyContextType {
   opportunitiesByStrategy: Record<string, OpportunityData>;
   loadingOpportunities: Record<string, boolean>;
   
+  // Scan job tracking
+  activeScanJobs: ScanJob[];
+  
   // Actions
   refreshStrategies: () => Promise<void>;
-  refreshAllOpportunities: () => Promise<void>;
+  refreshAllOpportunities: (useAsyncJobs?: boolean) => Promise<void>;
+  refreshStrategyWithProgress: (strategyId: string) => Promise<string>; // Returns jobId
   getStrategyOpportunities: (strategyId: string, symbol?: string) => Promise<void>;
   getStrategiesByCategory: (category: string) => StrategyMetadata[];
   getAllOpportunities: () => any[];
@@ -102,6 +114,7 @@ export const StrategyProvider: React.FC<StrategyProviderProps> = ({ children }) 
   const [error, setError] = useState<string | null>(null);
   const [opportunitiesByStrategy, setOpportunitiesByStrategy] = useState<Record<string, OpportunityData>>({});
   const [loadingOpportunities, setLoadingOpportunities] = useState<Record<string, boolean>>({});
+  const [activeScanJobs, setActiveScanJobs] = useState<ScanJob[]>([]);
   
   // Request deduplication with caching
   const [pendingRequests] = useState(new Map<string, Promise<any>>());
@@ -210,6 +223,74 @@ export const StrategyProvider: React.FC<StrategyProviderProps> = ({ children }) 
     } catch (err) {
       console.error('Error refreshing opportunities:', err);
       // Clear all loading states on error
+      setLoadingOpportunities({});
+    }
+  };
+
+  // New function for async job-based scanning with progress tracking
+  const refreshStrategyWithProgress = async (strategyId: string): Promise<string> => {
+    try {
+      const strategy = strategies.find(s => s.id === strategyId);
+      if (!strategy) {
+        throw new Error(`Strategy ${strategyId} not found`);
+      }
+
+      // Start async scan job
+      const response = await fetch(`/api/strategies/${strategyId}/quick-scan?async_job=true`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to start scan job: ${response.statusText}`);
+      }
+
+      const jobData = await response.json();
+      const jobId = jobData.job_id;
+
+      // Add to active jobs
+      const newJob: ScanJob = {
+        jobId,
+        strategyId,
+        strategyName: strategy.name,
+        status: 'running',
+        startedAt: new Date().toISOString()
+      };
+
+      setActiveScanJobs(prev => [...prev.filter(job => job.jobId !== jobId), newJob]);
+      
+      // Set loading state
+      setLoadingOpportunities(prev => ({ ...prev, [strategyId]: true }));
+
+      return jobId;
+    } catch (error) {
+      console.error(`Error starting scan job for ${strategyId}:`, error);
+      throw error;
+    }
+  };
+
+  // Update existing refreshAllOpportunities to support async mode
+  const refreshAllOpportunitiesWithJobs = async (useAsyncJobs: boolean = false) => {
+    if (!useAsyncJobs) {
+      // Use original synchronous implementation
+      return refreshAllOpportunities();
+    }
+
+    try {
+      // Set loading state for all strategies
+      const loadingState: Record<string, boolean> = {};
+      strategies.forEach(strategy => {
+        loadingState[strategy.id] = true;
+      });
+      setLoadingOpportunities(loadingState);
+
+      // Start async jobs for all active strategies
+      const activeStrategies = strategies.filter(s => s.status === 'active');
+      const jobPromises = activeStrategies.map(strategy => refreshStrategyWithProgress(strategy.id));
+      
+      await Promise.all(jobPromises);
+    } catch (error) {
+      console.error('Error starting async scan jobs:', error);
       setLoadingOpportunities({});
     }
   };
@@ -466,8 +547,10 @@ export const StrategyProvider: React.FC<StrategyProviderProps> = ({ children }) 
     error,
     opportunitiesByStrategy,
     loadingOpportunities,
+    activeScanJobs,
     refreshStrategies,
-    refreshAllOpportunities,
+    refreshAllOpportunities: refreshAllOpportunitiesWithJobs,
+    refreshStrategyWithProgress,
     getStrategyOpportunities,
     getStrategiesByCategory,
     getAllOpportunities,

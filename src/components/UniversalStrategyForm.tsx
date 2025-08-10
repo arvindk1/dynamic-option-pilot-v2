@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from './ui/card';
 import { Button } from './ui/button';
 import { Slider } from './ui/slider';
@@ -391,7 +391,7 @@ const loadPresetsFromStorage = (): Record<string, any> => {
   }
 };
 
-const UniversalStrategyForm: React.FC<UniversalStrategyFormProps> = ({ 
+const UniversalStrategyForm: React.FC<UniversalStrategyFormProps> = React.memo(({ 
   strategy, 
   baseStrategy, 
   onParameterChange 
@@ -401,11 +401,34 @@ const UniversalStrategyForm: React.FC<UniversalStrategyFormProps> = ({
   const [showPresets, setShowPresets] = useState(false);
   const [presetName, setPresetName] = useState('');
   
-  const sections = createUniversalMapping(strategy, baseStrategy);
+  const sections = React.useMemo(() => 
+    createUniversalMapping(strategy, baseStrategy), 
+    [strategy, baseStrategy]
+  );
 
-  const handleFieldChange = (key: string, value: any) => {
-    onParameterChange(key, value);
-  };
+  // Debounced parameter change to prevent scan spam
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  
+  const handleFieldChange = useCallback((key: string, value: any) => {
+    // Clear existing timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    
+    // Set new timer for 350ms debounce (good balance for UX)
+    debounceTimerRef.current = setTimeout(() => {
+      onParameterChange(key, value);
+    }, 350);
+  }, [onParameterChange]);
+
+  // Cleanup timer on unmount
+  React.useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
 
   // Preset management handlers
   const handleSavePreset = () => {
@@ -711,6 +734,6 @@ const UniversalStrategyForm: React.FC<UniversalStrategyFormProps> = ({
       </Card>
     </div>
   );
-};
+});
 
 export default UniversalStrategyForm;
