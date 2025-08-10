@@ -36,26 +36,51 @@ export const LazyTabContent: React.FC<LazyTabContentProps> = React.memo(({
   preload = false,
   className = "space-y-6"
 }) => {
+  console.log('🔍 LazyTabContent render:', { isActive, loadOnMount, preload });
+  
   const [shouldLoad, setShouldLoad] = useState(loadOnMount);
   const [hasLoaded, setHasLoaded] = useState(loadOnMount);
+  const [isLoading, setIsLoading] = useState(false);
+  
+  console.log('📊 LazyTabContent state:', { shouldLoad, hasLoaded, isLoading });
 
   useEffect(() => {
-    if ((isActive || preload) && !hasLoaded) {
+    console.log('🚀 LazyTabContent useEffect triggered:', { isActive, preload, hasLoaded, isLoading });
+    
+    if ((isActive || preload) && !hasLoaded && !isLoading) {
+      console.log('✅ LazyTabContent conditions met - starting load');
+      setIsLoading(true);
       setShouldLoad(true);
-      setHasLoaded(true);
+      
+      // Simulate async loading completion
+      const loadTimer = setTimeout(() => {
+        console.log('⏰ LazyTabContent timer fired - setting loaded');
+        setHasLoaded(true);
+        setIsLoading(false);
+      }, 100);
+      
+      return () => {
+        console.log('🧹 LazyTabContent timer cleanup');
+        clearTimeout(loadTimer);
+      };
+    } else {
+      console.log('❌ LazyTabContent conditions NOT met');
     }
-  }, [isActive, preload, hasLoaded]);
+  }, [isActive, preload, hasLoaded, isLoading]);
 
   // Don't render anything if not active and hasn't been loaded yet
   if (!isActive && !hasLoaded) {
+    console.log('🚫 LazyTabContent returning null - not active and not loaded');
     return null;
   }
 
   // Show loading state while loading for the first time
-  if (!shouldLoad || (isActive && !hasLoaded)) {
+  if (isLoading) {
+    console.log('⏳ LazyTabContent showing LoadingFallback');
     return <LoadingFallback />;
   }
 
+  console.log('🎉 LazyTabContent rendering children');
   return (
     <div 
       className={`${className} tab-content-wrapper`}

@@ -3,16 +3,22 @@
   "strategy_name": "My Custom Strategy",
   "strategy_type": "CUSTOM",
   "description": "Template for creating new options trading strategies",
-  
   "environments": {
     "test": {
       "position_parameters": {
         "max_opportunities": 5,
-        "target_dte_range": [7, 21],
+        "target_dte_range": [
+          7,
+          21
+        ],
         "max_positions": 2
       },
       "universe": {
-        "primary_symbols": ["SPY", "QQQ", "IWM"],
+        "primary_symbols": [
+          "SPY",
+          "QQQ",
+          "IWM"
+        ],
         "max_symbols": 3
       },
       "risk_management": {
@@ -23,11 +29,20 @@
     "live": {
       "position_parameters": {
         "max_opportunities": 15,
-        "target_dte_range": [7, 45],
+        "target_dte_range": [
+          7,
+          45
+        ],
         "max_positions": 10
       },
       "universe": {
-        "primary_symbols": ["SPY", "QQQ", "IWM", "XLK", "XLF"],
+        "primary_symbols": [
+          "SPY",
+          "QQQ",
+          "IWM",
+          "XLK",
+          "XLF"
+        ],
         "max_symbols": 20
       },
       "risk_management": {
@@ -36,48 +51,48 @@
       }
     }
   },
-  
   "shared_parameters": {
-    "delta_target": 0.20,
-    "min_credit_ratio": 0.10,
+    "delta_target": 0.2,
+    "min_credit_ratio": 0.1,
     "min_probability_profit": 0.65,
-    
     "entry_signals": {
-      "allow_bias": ["NEUTRAL", "BULLISH", "BEARISH"],
+      "allow_bias": [
+        "NEUTRAL",
+        "BULLISH",
+        "BEARISH"
+      ],
       "min_volatility_rank": 0,
       "max_volatility_rank": 100
     },
-    
     "exit_rules": {
       "profit_targets": [
-        { 
-          "level": 0.50, 
-          "action": "CLOSE_ALL", 
-          "percentage": 1.0, 
+        {
+          "level": 0.5,
+          "action": "CLOSE_ALL",
+          "percentage": 1.0,
           "priority": 90,
           "description": "Take profits at 50% of max profit"
         }
       ],
       "stop_loss_rules": [
-        { 
-          "type": "PERCENTAGE", 
-          "trigger": -0.30, 
-          "action": "CLOSE_ALL", 
+        {
+          "type": "PERCENTAGE",
+          "trigger": -0.3,
+          "action": "CLOSE_ALL",
           "priority": 100,
           "description": "Stop loss at 30% of max loss"
         }
       ],
       "time_exits": [
-        { 
-          "condition": "dte_less_than", 
-          "value": 2, 
-          "action": "CLOSE_ALL", 
+        {
+          "condition": "dte_less_than",
+          "value": 2,
+          "action": "CLOSE_ALL",
           "priority": 85,
           "description": "Close all positions 2 days before expiration"
         }
       ]
     },
-    
     "scoring": {
       "base_probability_weight": 3.0,
       "score_ceiling": 10.0,
@@ -85,21 +100,19 @@
       "round_decimals": 1
     }
   },
-  
   "educational_content": {
     "best_for": "Define when this strategy works best",
-    "when_to_use": "Specify market conditions for optimal performance",  
+    "when_to_use": "Specify market conditions for optimal performance",
     "profit_mechanism": "Explain how the strategy generates profit",
     "risk_level": "LOW|MEDIUM|HIGH",
     "typical_duration": "Specify typical holding period",
     "max_profit": "Define maximum profit potential",
     "max_loss": "Define maximum loss potential"
   },
-  
   "customization_guide": {
     "required_parameters": [
       "strategy_name",
-      "strategy_type", 
+      "strategy_type",
       "universe.primary_symbols",
       "position_parameters.target_dte_range"
     ],
@@ -109,11 +122,23 @@
       "scoring.base_probability_weight"
     ],
     "universe_options": [
-      "mag7", "top20", "etfs", "sector_leaders", "thetacrop"
+      "mag7",
+      "top20",
+      "etfs",
+      "sector_leaders",
+      "thetacrop"
     ],
     "strategy_types": [
-      "THETA_HARVESTING", "VOLATILITY_TRADING", "DIRECTIONAL", 
-      "NEUTRAL", "INCOME_GENERATION", "PROTECTIVE", "CUSTOM"
+      "THETA_HARVESTING",
+      "VOLATILITY_TRADING",
+      "DIRECTIONAL",
+      "NEUTRAL",
+      "INCOME_GENERATION",
+      "PROTECTIVE",
+      "CUSTOM"
     ]
+  },
+  "ui_metadata": {
+    "sections": []
   }
 }

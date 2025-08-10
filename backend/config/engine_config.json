@@ -1,0 +1,8 @@
+{
+  "data": {
+    "primary_provider": "yfinance",
+    "fallback_providers": ["yfinance"],
+    "cache_enabled": true,
+    "rate_limit_ms": 100
+  }
+}

@@ -101,5 +101,167 @@
     "max_profit": "Unlimited stock upside minus put premium",
     "max_loss": "Stock value down to put strike minus premium paid",
     "insurance_cost": "Put premium acts as insurance premium"
+  },
+
+  "ui_metadata": {
+    "sections": [
+      {
+        "id": "position_params",
+        "title": "Position Parameters",
+        "description": "Core position sizing and DTE parameters",
+        "fields": [
+          {
+            "key": "position_parameters.max_opportunities",
+            "label": "Max Opportunities",
+            "type": "number",
+            "description": "Maximum number of protection opportunities to find",
+            "min": 1,
+            "max": 10,
+            "step": 1,
+            "default": 3
+          },
+          {
+            "key": "position_parameters.target_dtes",
+            "label": "Target DTE Range",
+            "type": "range",
+            "description": "Days to expiration range for put options",
+            "min": 7,
+            "max": 90,
+            "step": 1,
+            "default": [30, 60]
+          },
+          {
+            "key": "position_parameters.protection_level",
+            "label": "Protection Level",
+            "type": "slider",
+            "description": "Strike price as percentage of stock price (0.95 = 5% OTM protection)",
+            "min": 0.85,
+            "max": 1.05,
+            "step": 0.01,
+            "default": 0.95,
+            "format": "percentage"
+          },
+          {
+            "key": "position_parameters.max_premium_pct_equity",
+            "label": "Max Premium % of Equity",
+            "type": "slider",
+            "description": "Maximum put premium as percentage of stock position value",
+            "min": 0.01,
+            "max": 0.10,
+            "step": 0.001,
+            "default": 0.02,
+            "format": "percentage"
+          }
+        ]
+      },
+      {
+        "id": "entry_signals",
+        "title": "Entry Signals",
+        "description": "When to initiate protective put positions",
+        "fields": [
+          {
+            "key": "entry_signals.max_drawdown_pct",
+            "label": "Max Drawdown Trigger",
+            "type": "slider",
+            "description": "Initiate protection after this drawdown percentage",
+            "min": 0.02,
+            "max": 0.15,
+            "step": 0.01,
+            "default": 0.05,
+            "format": "percentage"
+          },
+          {
+            "key": "entry_signals.volatility_spike_protection",
+            "label": "Volatility Spike Protection",
+            "type": "toggle",
+            "description": "Enable protection during volatility spikes",
+            "default": true
+          },
+          {
+            "key": "entry_signals.earnings_protection",
+            "label": "Earnings Protection",
+            "type": "toggle",
+            "description": "Enable protection before earnings announcements",
+            "default": true
+          }
+        ]
+      },
+      {
+        "id": "put_selection",
+        "title": "Put Selection Criteria",
+        "description": "How to select the optimal put options",
+        "fields": [
+          {
+            "key": "put_selection.delta_target",
+            "label": "Target Delta",
+            "type": "slider",
+            "description": "Target delta for put option selection",
+            "min": 0.15,
+            "max": 0.50,
+            "step": 0.01,
+            "default": 0.30
+          },
+          {
+            "key": "put_selection.min_dte",
+            "label": "Minimum DTE",
+            "type": "number",
+            "description": "Minimum days to expiration",
+            "min": 1,
+            "max": 30,
+            "step": 1,
+            "default": 7
+          },
+          {
+            "key": "put_selection.max_dte",
+            "label": "Maximum DTE",
+            "type": "number",
+            "description": "Maximum days to expiration",
+            "min": 30,
+            "max": 120,
+            "step": 1,
+            "default": 60
+          }
+        ]
+      },
+      {
+        "id": "risk_management",
+        "title": "Risk Management",
+        "description": "Portfolio-level risk controls",
+        "fields": [
+          {
+            "key": "risk_management.max_allocation_percentage",
+            "label": "Max Allocation %",
+            "type": "slider",
+            "description": "Maximum percentage of portfolio for protective puts",
+            "min": 5,
+            "max": 50,
+            "step": 1,
+            "default": 20,
+            "format": "percentage"
+          },
+          {
+            "key": "risk_management.max_insurance_cost_percentage",
+            "label": "Max Insurance Cost %",
+            "type": "slider",
+            "description": "Maximum cost of protection as percentage of portfolio",
+            "min": 1,
+            "max": 10,
+            "step": 0.5,
+            "default": 3,
+            "format": "percentage"
+          },
+          {
+            "key": "risk_management.portfolio_correlation_limit",
+            "label": "Portfolio Correlation Limit",
+            "type": "slider",
+            "description": "Maximum correlation between protected positions",
+            "min": 0.5,
+            "max": 1.0,
+            "step": 0.05,
+            "default": 0.8
+          }
+        ]
+      }
+    ]
   }
 }

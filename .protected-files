@@ -1,0 +1,9 @@
+backend/models/
+  backend/core/
+  backend/main.py
+  src/main.tsx
+  package.json
+  requirements.txt
+  .env*
+  docker-compose.yml
+  Dockerfile

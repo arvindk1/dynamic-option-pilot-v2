@@ -7,9 +7,10 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
+# Node.js dependencies and build outputs
+node_modules/
+dist/
+dist-ssr/
 *.local
 
 # Editor directories and files
@@ -22,16 +23,35 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Python
 __pycache__/
-backend/app.db
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Virtual environments
+venv/
 backend/venv/
+backend/scripts/venv/
+.kiro/
+
+# Environment and configuration
 .env
 backend/.env
-venv
-.kiro/
-backend/scripts/venv/
 
-node_modules/
-dist/
-
+# Database files
+backend/app.db
 backend/dev.db
+
+# Development and scratch artifacts
+debug_*.py
+debug_*.html
+test-minimal.html
+*_clean.log
+*_restart.log
+
+test.db
+
+

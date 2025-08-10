@@ -3,69 +3,83 @@
   "strategy_name": "ThetaCrop Weekly",
   "strategy_type": "THETA_HARVESTING",
   "description": "Weekly theta capture using iron condors on high-volume ETFs with tight delta management",
-  
   "universe": {
     "universe_file": "backend/data/universes/thetacrop_symbols.txt",
     "universe_name": "thetacrop",
     "symbol_type": "ETF",
-    "max_symbols": 10,
+    "max_symbols": 13,
     "symbol_selection": "top_by_volume",
     "min_volume": 1000000,
     "min_open_interest": 10000
   },
-  
   "timing": {
     "entry_day": 3,
     "entry_time": "11:30",
-    "scanning_hours_et": { 
-      "start_hour": 9, 
-      "end_hour": 20 
+    "scanning_hours_et": {
+      "start_hour": 9,
+      "end_hour": 20
     }
   },
-  
   "position_parameters": {
-    "target_dte_range": [5, 6, 7, 8, 9, 10],
-    "delta_target": 0.20,
-    "wing_widths": [2, 3, 4],
+    "target_dte_range": [
+      5,
+      6,
+      7,
+      8,
+      9,
+      10
+    ],
+    "delta_target": 0.2,
+    "wing_widths": [
+      2,
+      3,
+      4
+    ],
     "min_credit_ratio": 0.15,
     "position_size_per_3k": 1,
     "max_positions": 5
   },
-  
   "entry_signals": {
     "min_credit_to_width_ratio": 0.05,
-    "dte_range_days": [1, 30],
+    "dte_range_days": [
+      1,
+      30
+    ],
     "max_net_delta_abs": 1.0,
     "min_credit_amount": 0.01,
     "min_volatility_rank": 0,
-    "allow_bias": ["NEUTRAL"],
-    "required_market_conditions": ["LOW_VOLATILITY", "RANGE_BOUND"]
+    "allow_bias": [
+      "NEUTRAL"
+    ],
+    "required_market_conditions": [
+      "LOW_VOLATILITY",
+      "RANGE_BOUND"
+    ]
   },
-  
   "exit_rules": {
     "profit_targets": [
-      { 
-        "level": 0.50, 
-        "action": "CLOSE_ALL", 
-        "percentage": 1.0, 
+      {
+        "level": 0.5,
+        "action": "CLOSE_ALL",
+        "percentage": 1.0,
         "priority": 90,
         "description": "Take profits at 50% of max profit"
       }
     ],
     "stop_loss_rules": [
-      { 
-        "type": "PERCENTAGE", 
-        "trigger": -0.30, 
-        "action": "CLOSE_ALL", 
+      {
+        "type": "PERCENTAGE",
+        "trigger": -0.3,
+        "action": "CLOSE_ALL",
         "priority": 100,
         "description": "Stop loss at 30% of max loss"
       }
     ],
     "time_exits": [
-      { 
-        "condition": "dte_less_than", 
-        "value": 1, 
-        "action": "CLOSE_ALL", 
+      {
+        "condition": "dte_less_than",
+        "value": 1,
+        "action": "CLOSE_ALL",
         "priority": 85,
         "description": "Close all positions 1 day before expiration"
       }
@@ -82,13 +96,20 @@
     ],
     "monitoring_frequency_seconds": 300
   },
-  
   "scoring": {
     "base_probability_weight": 4.0,
     "theta_bonus": [
-      {"days_to_expiry_lt": 7, "bonus": 2.0},
-      {"days_to_expiry_lt": 10, "bonus": 1.5},
-      {"default": 1.0}
+      {
+        "days_to_expiry_lt": 7,
+        "bonus": 2.0
+      },
+      {
+        "days_to_expiry_lt": 10,
+        "bonus": 1.5
+      },
+      {
+        "default": 1.0
+      }
     ],
     "credit_ratio_bonus": {
       "multiplier": 3.0,
@@ -96,21 +117,27 @@
       "cap": 2.0
     },
     "volatility_bonus": [
-      {"iv_rank_lt": 30, "bonus": 1.5},
-      {"iv_rank_lt": 50, "bonus": 1.2},
-      {"default": 1.0}
+      {
+        "iv_rank_lt": 30,
+        "bonus": 1.5
+      },
+      {
+        "iv_rank_lt": 50,
+        "bonus": 1.2
+      },
+      {
+        "default": 1.0
+      }
     ],
     "score_ceiling": 10.0,
     "score_floor": 3.0,
     "round_decimals": 1
   },
-
   "risk_management": {
     "max_allocation_percentage": 15,
     "correlation_limit": 0.7,
     "var_limit_percentage": 2.0
   },
-  
   "educational_content": {
     "best_for": "Consistent income generation through time decay",
     "when_to_use": "Low to moderate volatility environments with range-bound markets",
@@ -119,5 +146,380 @@
     "typical_duration": "5-10 days",
     "max_profit": "Total premium collected",
     "max_loss": "Wing width minus premium collected"
+  },
+  "ui_metadata": {
+    "sections": [
+      {
+        "id": "position_parameters",
+        "title": "Position Parameters",
+        "description": "Core position sizing and timing parameters",
+        "fields": [
+          {
+            "key": "position_parameters.target_dte_range",
+            "label": "Target Dte Range",
+            "description": "Target target dte range",
+            "type": "text",
+            "default": "[5, 6, 7, 8, 9, 10]"
+          },
+          {
+            "key": "position_parameters.delta_target",
+            "label": "Delta Target",
+            "description": "Target delta for option selection",
+            "type": "slider",
+            "default": 0.2,
+            "min": 0.05,
+            "max": 0.95,
+            "step": 0.01
+          },
+          {
+            "key": "position_parameters.wing_widths",
+            "label": "Wing Widths",
+            "description": "Wing Widths parameter",
+            "type": "text",
+            "default": "[2, 3, 4]"
+          },
+          {
+            "key": "position_parameters.min_credit_ratio",
+            "label": "Min Credit Ratio",
+            "description": "Minimum credit ratio",
+            "type": "slider",
+            "default": 0.15,
+            "min": 0.01,
+            "max": 1.0,
+            "step": 0.01,
+            "format": "percentage"
+          },
+          {
+            "key": "position_parameters.position_size_per_3k",
+            "label": "Position Size Per 3K",
+            "description": "Position Size Per 3K parameter",
+            "type": "number",
+            "default": 1,
+            "min": 1,
+            "max": 3,
+            "step": 1
+          },
+          {
+            "key": "position_parameters.max_positions",
+            "label": "Max Positions",
+            "description": "Maximum number of concurrent positions",
+            "type": "number",
+            "default": 5,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          }
+        ]
+      },
+      {
+        "id": "entry_signals",
+        "title": "Entry Signals",
+        "description": "Conditions for entering new positions",
+        "fields": [
+          {
+            "key": "entry_signals.min_credit_to_width_ratio",
+            "label": "Min Credit To Width Ratio",
+            "description": "Minimum credit to width ratio",
+            "type": "slider",
+            "default": 0.05,
+            "min": 0.01,
+            "max": 1.0,
+            "step": 0.01,
+            "format": "percentage"
+          },
+          {
+            "key": "entry_signals.dte_range_days",
+            "label": "Dte Range Days",
+            "description": "Dte Range Days parameter",
+            "type": "range",
+            "min": -9,
+            "max": 50,
+            "step": 1,
+            "default": [
+              1,
+              30
+            ]
+          },
+          {
+            "key": "entry_signals.max_net_delta_abs",
+            "label": "Max Net Delta Abs",
+            "description": "Maximum net delta abs",
+            "type": "slider",
+            "default": 1.0,
+            "min": 0.05,
+            "max": 0.95,
+            "step": 0.01
+          },
+          {
+            "key": "entry_signals.min_credit_amount",
+            "label": "Min Credit Amount",
+            "description": "Minimum credit amount",
+            "type": "slider",
+            "default": 0.01,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          },
+          {
+            "key": "entry_signals.min_volatility_rank",
+            "label": "Min Volatility Rank",
+            "description": "Minimum volatility rank",
+            "type": "number",
+            "default": 0,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          },
+          {
+            "key": "entry_signals.allow_bias",
+            "label": "Allow Bias",
+            "description": "Allow Bias parameter",
+            "type": "multiselect",
+            "options": [
+              "NEUTRAL"
+            ],
+            "default": [
+              "NEUTRAL"
+            ]
+          },
+          {
+            "key": "entry_signals.required_market_conditions",
+            "label": "Required Market Conditions",
+            "description": "Required Market Conditions parameter",
+            "type": "multiselect",
+            "options": [
+              "LOW_VOLATILITY",
+              "RANGE_BOUND"
+            ],
+            "default": [
+              "LOW_VOLATILITY",
+              "RANGE_BOUND"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "exit_rules",
+        "title": "Exit Rules",
+        "description": "Profit targets, stop losses, and exit conditions",
+        "fields": [
+          {
+            "key": "exit_rules.profit_targets",
+            "label": "Profit Targets",
+            "description": "Target profits",
+            "type": "text",
+            "default": "[{'level': 0.5, 'action': 'CLOSE_ALL', 'percentage': 1.0, 'priority': 90, 'description': 'Take profits at 50% of max profit'}]"
+          },
+          {
+            "key": "exit_rules.stop_loss_rules",
+            "label": "Stop Loss Rules",
+            "description": "Stop Loss Rules parameter",
+            "type": "text",
+            "default": "[{'type': 'PERCENTAGE', 'trigger': -0.3, 'action': 'CLOSE_ALL', 'priority': 100, 'description': 'Stop loss at 30% of max loss'}]"
+          },
+          {
+            "key": "exit_rules.time_exits",
+            "label": "Time Exits",
+            "description": "Time Exits parameter",
+            "type": "text",
+            "default": "[{'condition': 'dte_less_than', 'value': 1, 'action': 'CLOSE_ALL', 'priority': 85, 'description': 'Close all positions 1 day before expiration'}]"
+          },
+          {
+            "key": "exit_rules.assignment_protection",
+            "label": "Assignment Protection",
+            "description": "Assignment Protection parameter",
+            "type": "text",
+            "default": "[{'type': 'DELTA_BREACH', 'short_call_delta_max': 0.25, 'short_put_delta_min': -0.25, 'action': 'CLOSE_ALL', 'priority': 95, 'description': 'Close if delta breach indicates assignment risk'}]"
+          },
+          {
+            "key": "exit_rules.monitoring_frequency_seconds",
+            "label": "Monitoring Frequency Seconds",
+            "description": "Monitoring Frequency Seconds parameter",
+            "type": "number",
+            "default": 300,
+            "min": 150,
+            "max": 900,
+            "step": 1
+          }
+        ]
+      },
+      {
+        "id": "risk_management",
+        "title": "Risk Management",
+        "description": "Portfolio-level risk controls and limits",
+        "fields": [
+          {
+            "key": "risk_management.max_allocation_percentage",
+            "label": "Max Allocation Percentage",
+            "description": "Maximum allocation percentage",
+            "type": "number",
+            "default": 15,
+            "min": 1,
+            "max": 100,
+            "step": 1,
+            "format": "percentage"
+          },
+          {
+            "key": "risk_management.correlation_limit",
+            "label": "Correlation Limit",
+            "description": "Correlation Limit parameter",
+            "type": "slider",
+            "default": 0.7,
+            "min": 0.06999999999999999,
+            "max": 3.5,
+            "step": 0.01
+          },
+          {
+            "key": "risk_management.var_limit_percentage",
+            "label": "Var Limit Percentage",
+            "description": "Var Limit Percentage parameter",
+            "type": "slider",
+            "default": 2.0,
+            "min": 1,
+            "max": 100,
+            "step": 1,
+            "format": "percentage"
+          }
+        ]
+      },
+      {
+        "id": "scoring",
+        "title": "Scoring Parameters",
+        "description": "Opportunity scoring weights and criteria",
+        "fields": [
+          {
+            "key": "scoring.base_probability_weight",
+            "label": "Base Probability Weight",
+            "description": "Base Probability Weight parameter",
+            "type": "slider",
+            "default": 4.0,
+            "min": 0.4,
+            "max": 20.0,
+            "step": 0.01
+          },
+          {
+            "key": "scoring.theta_bonus",
+            "label": "Theta Bonus",
+            "description": "Theta Bonus parameter",
+            "type": "text",
+            "default": "[{'days_to_expiry_lt': 7, 'bonus': 2.0}, {'days_to_expiry_lt': 10, 'bonus': 1.5}, {'default': 1.0}]"
+          },
+          {
+            "key": "scoring.volatility_bonus",
+            "label": "Volatility Bonus",
+            "description": "Volatility Bonus parameter",
+            "type": "text",
+            "default": "[{'iv_rank_lt': 30, 'bonus': 1.5}, {'iv_rank_lt': 50, 'bonus': 1.2}, {'default': 1.0}]"
+          },
+          {
+            "key": "scoring.score_ceiling",
+            "label": "Score Ceiling",
+            "description": "Score Ceiling parameter",
+            "type": "slider",
+            "default": 10.0,
+            "min": 1.0,
+            "max": 50.0,
+            "step": 0.01
+          },
+          {
+            "key": "scoring.score_floor",
+            "label": "Score Floor",
+            "description": "Score Floor parameter",
+            "type": "slider",
+            "default": 3.0,
+            "min": 0.30000000000000004,
+            "max": 15.0,
+            "step": 0.01
+          },
+          {
+            "key": "scoring.round_decimals",
+            "label": "Round Decimals",
+            "description": "Round Decimals parameter",
+            "type": "number",
+            "default": 1,
+            "min": 1,
+            "max": 3,
+            "step": 1
+          }
+        ]
+      },
+      {
+        "id": "universe",
+        "title": "Trading Universe",
+        "description": "Symbol selection and filtering criteria",
+        "fields": [
+          {
+            "key": "universe.universe_file",
+            "label": "Universe File",
+            "description": "Universe File parameter",
+            "type": "select",
+            "options": [
+              "backend/data/universes/thetacrop_symbols.txt"
+            ],
+            "default": "backend/data/universes/thetacrop_symbols.txt"
+          },
+          {
+            "key": "universe.universe_name",
+            "label": "Universe Name",
+            "description": "Universe Name parameter",
+            "type": "select",
+            "options": [
+              "thetacrop"
+            ],
+            "default": "thetacrop"
+          },
+          {
+            "key": "universe.symbol_type",
+            "label": "Symbol Type",
+            "description": "Symbol Type parameter",
+            "type": "select",
+            "options": [
+              "ETF"
+            ],
+            "default": "ETF"
+          },
+          {
+            "key": "universe.max_symbols",
+            "label": "Max Symbols",
+            "description": "Maximum symbols",
+            "type": "number",
+            "default": 13,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          },
+          {
+            "key": "universe.symbol_selection",
+            "label": "Symbol Selection",
+            "description": "Symbol Selection parameter",
+            "type": "select",
+            "options": [
+              "top_by_volume"
+            ],
+            "default": "top_by_volume"
+          },
+          {
+            "key": "universe.min_volume",
+            "label": "Min Volume",
+            "description": "Minimum volume",
+            "type": "number",
+            "default": 1000000,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          },
+          {
+            "key": "universe.min_open_interest",
+            "label": "Min Open Interest",
+            "description": "Minimum open interest",
+            "type": "number",
+            "default": 10000,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          }
+        ]
+      }
+    ]
   }
 }

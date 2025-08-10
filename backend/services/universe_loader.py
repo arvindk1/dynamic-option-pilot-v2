@@ -152,11 +152,25 @@ class UniverseLoader:
             return top20 + other_symbols
             
         elif strategy == 'theta_crop':
-            # Prioritize ETFs and stable large caps
-            etfs = ['SPY', 'QQQ', 'IWM', 'XLK', 'XLF']
-            stable_stocks = ['AAPL', 'MSFT', 'GOOGL', 'JPM', 'WMT']
-            other_symbols = [s for s in symbols if s not in etfs and s not in stable_stocks]
-            return etfs + stable_stocks + other_symbols
+            # Use ThetaCrop universe from external file
+            try:
+                thetacrop_symbols = self.get_universe('thetacrop_symbols.txt')
+                # Prioritize symbols from ThetaCrop file first
+                other_symbols = [s for s in symbols if s not in thetacrop_symbols]
+                return thetacrop_symbols + other_symbols
+            except Exception as e:
+                # Log critical error instead of fallback
+                from services.error_logging_service import log_critical_error
+                import asyncio
+                asyncio.create_task(log_critical_error(
+                    error_type="universe_loading_failure",
+                    message=f"ThetaCrop universe file failed to load: {e}",
+                    details={"universe_name": "thetacrop_symbols", "error": str(e)},
+                    service="universe_loader",
+                    severity="HIGH"
+                ))
+                logger.error(f"Universe loading failed - no fallback provided: {e}")
+                raise RuntimeError(f"Universe file 'thetacrop_symbols' could not be loaded: {e}. System health compromised.")
             
         else:
             return symbols

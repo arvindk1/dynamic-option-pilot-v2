@@ -21,6 +21,7 @@ from models.sandbox import (
 )
 from core.orchestrator.strategy_registry import get_strategy_registry
 from services.universe_loader import get_universe_loader
+from services.strategy_specific_scanner import get_strategy_specific_scanner
 from plugins.trading.base_strategy import StrategyConfig, StrategyOpportunity
 
 logger = logging.getLogger(__name__)
@@ -210,83 +211,69 @@ class SandboxTestEngine:
         start_time = datetime.utcnow()
         
         try:
-            # Get database session
+            # Use new strategy-specific scanner instead of live strategy registry
+            strategy_scanner = get_strategy_specific_scanner()
+            
+            # Map sandbox config to strategy type by looking up base strategy configuration
+            strategy_config_data = config.config_data
+            
+            # Get the strategy type by reading from the JSON configuration file
+            try:
+                # Read strategy config directly from file
+                config_file_path = Path(__file__).parent.parent / "config" / "strategies" / "development" / f"{config.strategy_id}.json"
+                if config_file_path.exists():
+                    with open(config_file_path, 'r') as f:
+                        base_config = json.load(f)
+                    strategy_type = base_config.get('strategy_type', config.strategy_id.upper())
+                    logger.info(f"Loaded strategy_type '{strategy_type}' for {config.strategy_id} from config file")
+                else:
+                    # Fallback: try to get from sandbox config or use strategy_id  
+                    strategy_info = strategy_config_data.get('strategy', {})
+                    strategy_type = strategy_info.get('strategy_type', config.strategy_id.upper())
+                    logger.warning(f"Config file not found for {config.strategy_id}, using fallback: {strategy_type}")
+            except Exception as e:
+                # Final fallback
+                logger.warning(f"Could not determine strategy_type for {config.strategy_id}: {e}")
+                strategy_type = config.strategy_id.upper()
+            
+            # Use strategy-specific scanning
+            scan_result = await strategy_scanner.scan_strategy(
+                strategy_type=strategy_type,
+                sandbox_config=strategy_config_data,
+                test_params=test_params
+            )
+            
+            if not scan_result.get('success', False):
+                return self._create_error_result(scan_result.get('error', 'Strategy scanning failed'))
+            
+            opportunities = scan_result.get('opportunities', [])
+            symbols_scanned = scan_result.get('symbols_scanned', [])
+            
+            logger.info(f"Strategy-specific scan completed for {strategy_type}: {len(opportunities)} opportunities found")
+            
+            # Calculate performance metrics
+            performance_metrics = self._calculate_performance_metrics(opportunities)
+            
+            # Calculate execution time
+            execution_time = int((datetime.utcnow() - start_time).total_seconds() * 1000)
+            
+            # Create test results
+            results = {
+                'success': True,
+                'opportunities': opportunities,  # Already in dict format from scanner
+                'opportunities_count': len(opportunities),
+                'symbols_tested': symbols_scanned,
+                'strategy_type': strategy_type,
+                'performance_metrics': performance_metrics,
+                'execution_time_ms': execution_time,
+                'timestamp': datetime.utcnow().isoformat()
+            }
+            
+            # Get database session for saving results
             db_gen = get_db()
             db = next(db_gen)
             
             try:
-                # Get strategy registry
-                strategy_registry = get_strategy_registry()
-                if not strategy_registry:
-                    return self._create_error_result("Strategy registry not available")
-                
-                # Get strategy instance - map sandbox strategy_ids to live strategy IDs
-                strategy_id_mapping = {
-                    'thetacrop_weekly': 'ThetaCropWeekly',
-                    'iron_condor': 'IronCondor',
-                    'rsi_coupon': 'RSICouponStrategy',
-                    'credit_spread': 'CreditSpread',
-                    'covered_call': 'CoveredCall'
-                }
-                
-                live_strategy_id = strategy_id_mapping.get(config.strategy_id, config.strategy_id)
-                strategy_instance = strategy_registry.get_strategy(live_strategy_id)
-                if not strategy_instance:
-                    return self._create_error_result(f"Strategy {config.strategy_id} (mapped to {live_strategy_id}) not found")
-                
-                # Get universe symbols
-                universe_loader = get_universe_loader()
-                test_symbols = test_params.get('symbols') if test_params else None
-                
-                if not test_symbols:
-                    # Use strategy's configured universe (external file preferred)
-                    strategy_config = config.config_data
-                    universe_config = strategy_config.get('universe', {})
-                    
-                    if 'universe_file' in universe_config:
-                        # Load from external file
-                        try:
-                            universe_symbols = universe_loader.load_universe_symbols(universe_config['universe_file'])
-                        except Exception as e:
-                            logger.warning(f"Failed to load universe file: {e}, falling back to primary_symbols")
-                            universe_symbols = universe_config.get('primary_symbols', [])
-                    else:
-                        universe_symbols = universe_config.get('primary_symbols', [])
-                    
-                    if not universe_symbols:
-                        # Load default universe if no symbols found
-                        try:
-                            universe_symbols = universe_loader.load_universe_symbols("default_etfs.txt")
-                        except Exception:
-                            universe_symbols = ['SPY', 'QQQ', 'IWM']  # Final fallback
-                    
-                    test_symbols = universe_symbols[:5]  # Limit for testing
-                
-                logger.info(f"Running sandbox test for {config.strategy_id} with symbols: {test_symbols}")
-                
-                # Get cached market data
-                market_data = await self.data_cache.get_cached_market_data(test_symbols, db)
-                
-                # Execute strategy test
-                opportunities = await self._execute_strategy_with_cached_data(
-                    strategy_instance, test_symbols, market_data, config.config_data
-                )
-                
-                # Calculate execution time
-                execution_time = int((datetime.utcnow() - start_time).total_seconds() * 1000)
-                
-                # Create test results
-                results = {
-                    'success': True,
-                    'opportunities': [self._opportunity_to_dict(opp) for opp in opportunities],
-                    'opportunities_count': len(opportunities),
-                    'symbols_tested': test_symbols,
-                    'market_data_used': market_data,
-                    'performance_metrics': self._calculate_performance_metrics(opportunities),
-                    'execution_time_ms': execution_time,
-                    'timestamp': datetime.utcnow().isoformat()
-                }
-                
                 # Save test run to database
                 test_run = SandboxTestRun.create_test_run(
                     config_id=config.id,
@@ -395,7 +382,7 @@ class SandboxTestEngine:
             'is_sandbox_test': True
         }
     
-    def _calculate_performance_metrics(self, opportunities: List[StrategyOpportunity]) -> Dict[str, Any]:
+    def _calculate_performance_metrics(self, opportunities: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Calculate performance metrics for test results"""
         if not opportunities:
             return {
@@ -405,10 +392,52 @@ class SandboxTestEngine:
                 'risk_reward_ratio': 0.0
             }
         
-        avg_prob = sum(opp.probability_profit for opp in opportunities) / len(opportunities)
-        avg_ev = sum(opp.expected_value for opp in opportunities) / len(opportunities)
-        avg_premium = sum(opp.premium for opp in opportunities) / len(opportunities)
-        avg_max_loss = sum(opp.max_loss for opp in opportunities) / len(opportunities)
+        # Handle different opportunity formats from strategy-specific scanner
+        total_prob = 0
+        total_ev = 0
+        total_premium = 0
+        total_max_loss = 0
+        valid_count = 0
+        
+        for opp in opportunities:
+            # Extract values with safe defaults
+            prob = opp.get('probability_profit', 0.0)
+            
+            # Handle expected value calculation if not present
+            ev = opp.get('expected_value', 0.0)
+            if ev == 0.0:
+                premium = opp.get('premium', opp.get('premium_paid', opp.get('insurance_cost', 0.0)))
+                max_loss = opp.get('max_loss', premium)
+                if isinstance(max_loss, str):  # Handle "Unlimited" cases
+                    max_loss = premium
+                ev = premium * prob - max_loss * (1 - prob) if max_loss > 0 else premium * prob
+            
+            premium = opp.get('premium', opp.get('premium_paid', opp.get('insurance_cost', 0.0)))
+            max_loss = opp.get('max_loss', premium)
+            if isinstance(max_loss, str):  # Handle "Unlimited" cases
+                max_loss = premium
+            
+            total_prob += prob
+            total_ev += ev
+            total_premium += premium
+            total_max_loss += max_loss
+            valid_count += 1
+        
+        if valid_count == 0:
+            return {
+                'total_opportunities': 0,
+                'avg_probability_profit': 0.0,
+                'avg_expected_value': 0.0,
+                'avg_premium': 0.0,
+                'avg_max_loss': 0.0,
+                'risk_reward_ratio': 0.0,
+                'symbols_with_opportunities': 0
+            }
+        
+        avg_prob = total_prob / valid_count
+        avg_ev = total_ev / valid_count
+        avg_premium = total_premium / valid_count
+        avg_max_loss = total_max_loss / valid_count
         
         risk_reward = avg_premium / avg_max_loss if avg_max_loss > 0 else 0
         
@@ -419,7 +448,7 @@ class SandboxTestEngine:
             'avg_premium': round(avg_premium, 2),
             'avg_max_loss': round(avg_max_loss, 2),
             'risk_reward_ratio': round(risk_reward, 4),
-            'symbols_with_opportunities': len(set(opp.symbol for opp in opportunities))
+            'symbols_with_opportunities': len(set(opp.get('symbol', 'Unknown') for opp in opportunities))
         }
     
     def _create_error_result(self, error_message: str) -> Dict[str, Any]:
@@ -546,6 +575,77 @@ class SandboxService:
             return {'success': False, 'error': f'Configuration {config_id} not found'}
         
         return await self.test_engine.run_strategy_test(config, test_params)
+    
+    async def run_batch_parameter_test(self, config_id: str, parameter_sets: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Run batch tests with different parameter combinations"""
+        config = await self.get_strategy_config(config_id)
+        if not config:
+            return {'success': False, 'error': f'Configuration {config_id} not found'}
+        
+        batch_results = []
+        start_time = datetime.utcnow()
+        
+        for i, param_set in enumerate(parameter_sets):
+            # Create modified config for this parameter set
+            modified_config_data = {**config.config_data}
+            
+            # Apply parameter modifications
+            for param_path, value in param_set.items():
+                keys = param_path.split('.')
+                current = modified_config_data
+                for key in keys[:-1]:
+                    if key not in current:
+                        current[key] = {}
+                    current = current[key]
+                current[keys[-1]] = value
+            
+            # Create temporary config
+            temp_config = SandboxStrategyConfig(
+                id=f"{config.id}_batch_{i}",
+                strategy_id=config.strategy_id,
+                name=f"{config.name} (Batch {i+1})",
+                config_data=modified_config_data,
+                user_id=config.user_id,
+                version=config.version,
+                is_active=False
+            )
+            
+            # Run test with modified parameters
+            result = await self.test_engine.run_strategy_test(temp_config)
+            result['parameter_set'] = param_set
+            result['test_index'] = i + 1
+            batch_results.append(result)
+        
+        execution_time = int((datetime.utcnow() - start_time).total_seconds() * 1000)
+        
+        # Find best performing parameter set
+        best_result = None
+        best_score = -1
+        
+        for result in batch_results:
+            if result.get('success') and result.get('performance_metrics'):
+                # Score based on expected value and win rate
+                metrics = result['performance_metrics']
+                score = (metrics.get('avg_expected_value', 0) * 
+                        metrics.get('avg_probability_profit', 0))
+                
+                if score > best_score:
+                    best_score = score
+                    best_result = result
+        
+        return {
+            'success': True,
+            'batch_results': batch_results,
+            'total_tests': len(parameter_sets),
+            'execution_time_ms': execution_time,
+            'best_performing': best_result,
+            'summary': {
+                'total_opportunities': sum(r.get('opportunities_count', 0) for r in batch_results),
+                'avg_opportunities_per_test': sum(r.get('opportunities_count', 0) for r in batch_results) / len(batch_results),
+                'successful_tests': sum(1 for r in batch_results if r.get('success'))
+            },
+            'timestamp': datetime.utcnow().isoformat()
+        }
     
     async def get_test_results(self, config_id: str, limit: int = 10) -> List[SandboxTestRun]:
         """Get recent test results for a strategy"""

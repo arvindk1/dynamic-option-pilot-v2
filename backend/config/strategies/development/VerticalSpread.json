@@ -3,77 +3,97 @@
   "strategy_name": "Vertical Spread",
   "strategy_type": "VERTICAL_SPREAD",
   "description": "Buy one option and sell another at a different strike - directional strategy with defined risk",
-  
   "subtypes": {
-    "available": ["BULL_CALL", "BEAR_PUT", "BULL_PUT", "BEAR_CALL"],
-    "preferred": ["BULL_CALL", "BEAR_PUT"]
+    "available": [
+      "BULL_CALL",
+      "BEAR_PUT",
+      "BULL_PUT",
+      "BEAR_CALL"
+    ],
+    "preferred": [
+      "BULL_CALL",
+      "BEAR_PUT"
+    ]
   },
-  
   "universe": {
-    "symbol_types": ["STOCK", "ETF"],
+    "symbol_types": [
+      "STOCK",
+      "ETF"
+    ],
     "min_market_cap": 5000000000,
     "min_avg_volume": 2000000,
     "min_option_volume": 1000,
     "liquid_strikes_required": true
   },
-  
   "position_parameters": {
     "max_debit_pct_equity": 0.03,
     "min_width": 5,
     "max_width": 20,
     "max_opportunities": 5
   },
-  
   "entry_signals": {
     "min_bias_strength": "MODERATE",
     "max_volatility": 0.35,
-    "allowed_bias": ["BULLISH", "BEARISH"],
-    "forbidden_bias": ["NEUTRAL"]
+    "allowed_bias": [
+      "BULLISH",
+      "BEARISH"
+    ],
+    "forbidden_bias": [
+      "NEUTRAL"
+    ]
   },
-  
   "strike_selection": {
     "delta_buy": 0.25,
     "delta_sell": 0.15,
-    "spread_widths": [5, 10, 15, 20],
+    "spread_widths": [
+      5,
+      10,
+      15,
+      20
+    ],
     "min_risk_reward_ratio": 1.5,
     "max_risk_reward_ratio": 4.0
   },
-  
   "timing": {
-    "dte_range": [7, 45],
-    "optimal_dte": [21, 35],
+    "dte_range": [
+      7,
+      45
+    ],
+    "optimal_dte": [
+      21,
+      35
+    ],
     "avoid_earnings": true
   },
-  
   "exit_rules": {
     "profit_targets": [
-      { 
-        "level": 0.50, 
-        "action": "CLOSE_SPREAD", 
+      {
+        "level": 0.5,
+        "action": "CLOSE_SPREAD",
         "priority": 90,
         "description": "Close at 50% of max profit"
       },
-      { 
-        "level": 0.75, 
-        "action": "CLOSE_SPREAD", 
+      {
+        "level": 0.75,
+        "action": "CLOSE_SPREAD",
         "priority": 85,
         "description": "Close at 75% of max profit if close to expiration"
       }
     ],
     "stop_loss_rules": [
-      { 
-        "type": "PERCENTAGE", 
-        "trigger": -0.50, 
-        "action": "CLOSE_SPREAD", 
+      {
+        "type": "PERCENTAGE",
+        "trigger": -0.5,
+        "action": "CLOSE_SPREAD",
         "priority": 100,
         "description": "Close at 50% of max loss"
       }
     ],
     "time_exits": [
-      { 
-        "condition": "dte_less_than", 
-        "value": 2, 
-        "action": "CLOSE_SPREAD", 
+      {
+        "condition": "dte_less_than",
+        "value": 2,
+        "action": "CLOSE_SPREAD",
         "priority": 80,
         "description": "Close 2 days before expiration"
       }
@@ -87,7 +107,6 @@
       }
     ]
   },
-  
   "scoring": {
     "risk_reward_weight": 0.5,
     "probability_weight": 0.3,
@@ -101,14 +120,12 @@
     "score_ceiling": 10.0,
     "round_decimals": 1
   },
-  
   "risk_management": {
     "max_allocation_percentage": 25,
     "max_single_spread_cost": 1000,
     "correlation_limit": 0.7,
     "sector_concentration_limit": 0.4
   },
-  
   "educational_content": {
     "best_for": "Directional trades with limited risk and defined profit potential",
     "when_to_use": "Moderate to strong directional bias with controlled risk",
@@ -118,5 +135,375 @@
     "max_profit": "Spread width minus net debit paid",
     "max_loss": "Net debit paid (limited risk)",
     "breakeven": "Long strike +/- net debit (calls/puts)"
+  },
+  "ui_metadata": {
+    "sections": [
+      {
+        "id": "position_parameters",
+        "title": "Position Parameters",
+        "description": "Core position sizing and timing parameters",
+        "fields": [
+          {
+            "key": "position_parameters.max_debit_pct_equity",
+            "label": "Max Debit Pct Equity",
+            "description": "Maximum debit pct equity",
+            "type": "slider",
+            "default": 0.03,
+            "min": 0.01,
+            "max": 1.0,
+            "step": 0.01,
+            "format": "percentage"
+          },
+          {
+            "key": "position_parameters.min_width",
+            "label": "Min Width",
+            "description": "Minimum width",
+            "type": "number",
+            "default": 5,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          },
+          {
+            "key": "position_parameters.max_width",
+            "label": "Max Width",
+            "description": "Maximum width",
+            "type": "number",
+            "default": 20,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          },
+          {
+            "key": "position_parameters.max_opportunities",
+            "label": "Max Opportunities",
+            "description": "Maximum number of opportunities to find",
+            "type": "number",
+            "default": 5,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          }
+        ]
+      },
+      {
+        "id": "entry_signals",
+        "title": "Entry Signals",
+        "description": "Conditions for entering new positions",
+        "fields": [
+          {
+            "key": "entry_signals.min_bias_strength",
+            "label": "Min Bias Strength",
+            "description": "Minimum bias strength",
+            "type": "select",
+            "options": [
+              "MODERATE"
+            ],
+            "default": "MODERATE"
+          },
+          {
+            "key": "entry_signals.max_volatility",
+            "label": "Max Volatility",
+            "description": "Maximum volatility",
+            "type": "slider",
+            "default": 0.35,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          },
+          {
+            "key": "entry_signals.allowed_bias",
+            "label": "Allowed Bias",
+            "description": "Allowed Bias parameter",
+            "type": "multiselect",
+            "options": [
+              "BULLISH",
+              "BEARISH"
+            ],
+            "default": [
+              "BULLISH",
+              "BEARISH"
+            ]
+          },
+          {
+            "key": "entry_signals.forbidden_bias",
+            "label": "Forbidden Bias",
+            "description": "Forbidden Bias parameter",
+            "type": "multiselect",
+            "options": [
+              "NEUTRAL"
+            ],
+            "default": [
+              "NEUTRAL"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "exit_rules",
+        "title": "Exit Rules",
+        "description": "Profit targets, stop losses, and exit conditions",
+        "fields": [
+          {
+            "key": "exit_rules.profit_targets",
+            "label": "Profit Targets",
+            "description": "Target profits",
+            "type": "text",
+            "default": "[{'level': 0.5, 'action': 'CLOSE_SPREAD', 'priority': 90, 'description': 'Close at 50% of max profit'}, {'level': 0.75, 'action': 'CLOSE_SPREAD', 'priority': 85, 'description': 'Close at 75% of max profit if close to expiration'}]"
+          },
+          {
+            "key": "exit_rules.stop_loss_rules",
+            "label": "Stop Loss Rules",
+            "description": "Stop Loss Rules parameter",
+            "type": "text",
+            "default": "[{'type': 'PERCENTAGE', 'trigger': -0.5, 'action': 'CLOSE_SPREAD', 'priority': 100, 'description': 'Close at 50% of max loss'}]"
+          },
+          {
+            "key": "exit_rules.time_exits",
+            "label": "Time Exits",
+            "description": "Time Exits parameter",
+            "type": "text",
+            "default": "[{'condition': 'dte_less_than', 'value': 2, 'action': 'CLOSE_SPREAD', 'priority': 80, 'description': 'Close 2 days before expiration'}]"
+          },
+          {
+            "key": "exit_rules.technical_exits",
+            "label": "Technical Exits",
+            "description": "Technical Exits parameter",
+            "type": "text",
+            "default": "[{'condition': 'bias_reversal', 'action': 'CLOSE_SPREAD', 'priority': 95, 'description': 'Close if directional bias reverses'}]"
+          }
+        ]
+      },
+      {
+        "id": "risk_management",
+        "title": "Risk Management",
+        "description": "Portfolio-level risk controls and limits",
+        "fields": [
+          {
+            "key": "risk_management.max_allocation_percentage",
+            "label": "Max Allocation Percentage",
+            "description": "Maximum allocation percentage",
+            "type": "number",
+            "default": 25,
+            "min": 1,
+            "max": 100,
+            "step": 1,
+            "format": "percentage"
+          },
+          {
+            "key": "risk_management.max_single_spread_cost",
+            "label": "Max Single Spread Cost",
+            "description": "Maximum single spread cost",
+            "type": "number",
+            "default": 1000,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          },
+          {
+            "key": "risk_management.correlation_limit",
+            "label": "Correlation Limit",
+            "description": "Correlation Limit parameter",
+            "type": "slider",
+            "default": 0.7,
+            "min": 0.06999999999999999,
+            "max": 3.5,
+            "step": 0.01
+          },
+          {
+            "key": "risk_management.sector_concentration_limit",
+            "label": "Sector Concentration Limit",
+            "description": "Sector Concentration Limit parameter",
+            "type": "slider",
+            "default": 0.4,
+            "min": 0.01,
+            "max": 1.0,
+            "step": 0.01,
+            "format": "percentage"
+          }
+        ]
+      },
+      {
+        "id": "strike_selection",
+        "title": "Strike Selection",
+        "description": "How to select optimal strike prices",
+        "fields": [
+          {
+            "key": "strike_selection.delta_buy",
+            "label": "Delta Buy",
+            "description": "Delta Buy parameter",
+            "type": "slider",
+            "default": 0.25,
+            "min": 0.05,
+            "max": 0.95,
+            "step": 0.01
+          },
+          {
+            "key": "strike_selection.delta_sell",
+            "label": "Delta Sell",
+            "description": "Delta Sell parameter",
+            "type": "slider",
+            "default": 0.15,
+            "min": 0.05,
+            "max": 0.95,
+            "step": 0.01
+          },
+          {
+            "key": "strike_selection.spread_widths",
+            "label": "Spread Widths",
+            "description": "Spread Widths parameter",
+            "type": "text",
+            "default": "[5, 10, 15, 20]"
+          },
+          {
+            "key": "strike_selection.min_risk_reward_ratio",
+            "label": "Min Risk Reward Ratio",
+            "description": "Minimum risk reward ratio",
+            "type": "slider",
+            "default": 1.5,
+            "min": 1,
+            "max": 100,
+            "step": 1,
+            "format": "percentage"
+          },
+          {
+            "key": "strike_selection.max_risk_reward_ratio",
+            "label": "Max Risk Reward Ratio",
+            "description": "Maximum risk reward ratio",
+            "type": "slider",
+            "default": 4.0,
+            "min": 1,
+            "max": 100,
+            "step": 1,
+            "format": "percentage"
+          }
+        ]
+      },
+      {
+        "id": "scoring",
+        "title": "Scoring Parameters",
+        "description": "Opportunity scoring weights and criteria",
+        "fields": [
+          {
+            "key": "scoring.risk_reward_weight",
+            "label": "Risk Reward Weight",
+            "description": "Risk Reward Weight parameter",
+            "type": "slider",
+            "default": 0.5,
+            "min": 0.05,
+            "max": 2.5,
+            "step": 0.01
+          },
+          {
+            "key": "scoring.probability_weight",
+            "label": "Probability Weight",
+            "description": "Probability Weight parameter",
+            "type": "slider",
+            "default": 0.3,
+            "min": 0.03,
+            "max": 1.5,
+            "step": 0.01
+          },
+          {
+            "key": "scoring.cost_weight",
+            "label": "Cost Weight",
+            "description": "Cost Weight parameter",
+            "type": "slider",
+            "default": 0.2,
+            "min": 0.020000000000000004,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "scoring.score_floor",
+            "label": "Score Floor",
+            "description": "Score Floor parameter",
+            "type": "slider",
+            "default": 1.0,
+            "min": 0.1,
+            "max": 5.0,
+            "step": 0.01
+          },
+          {
+            "key": "scoring.score_ceiling",
+            "label": "Score Ceiling",
+            "description": "Score Ceiling parameter",
+            "type": "slider",
+            "default": 10.0,
+            "min": 1.0,
+            "max": 50.0,
+            "step": 0.01
+          },
+          {
+            "key": "scoring.round_decimals",
+            "label": "Round Decimals",
+            "description": "Round Decimals parameter",
+            "type": "number",
+            "default": 1,
+            "min": 1,
+            "max": 3,
+            "step": 1
+          }
+        ]
+      },
+      {
+        "id": "universe",
+        "title": "Trading Universe",
+        "description": "Symbol selection and filtering criteria",
+        "fields": [
+          {
+            "key": "universe.symbol_types",
+            "label": "Symbol Types",
+            "description": "Symbol Types parameter",
+            "type": "multiselect",
+            "options": [
+              "STOCK",
+              "ETF"
+            ],
+            "default": [
+              "STOCK",
+              "ETF"
+            ]
+          },
+          {
+            "key": "universe.min_market_cap",
+            "label": "Min Market Cap",
+            "description": "Minimum market cap",
+            "type": "number",
+            "default": 5000000000,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          },
+          {
+            "key": "universe.min_avg_volume",
+            "label": "Min Avg Volume",
+            "description": "Minimum avg volume",
+            "type": "number",
+            "default": 2000000,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          },
+          {
+            "key": "universe.min_option_volume",
+            "label": "Min Option Volume",
+            "description": "Minimum option volume",
+            "type": "number",
+            "default": 1000,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          },
+          {
+            "key": "universe.liquid_strikes_required",
+            "label": "Liquid Strikes Required",
+            "description": "Liquid Strikes Required parameter",
+            "type": "toggle",
+            "default": true
+          }
+        ]
+      }
+    ]
   }
 }

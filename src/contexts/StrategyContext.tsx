@@ -102,6 +102,23 @@ export const StrategyProvider: React.FC<StrategyProviderProps> = ({ children }) 
   const [error, setError] = useState<string | null>(null);
   const [opportunitiesByStrategy, setOpportunitiesByStrategy] = useState<Record<string, OpportunityData>>({});
   const [loadingOpportunities, setLoadingOpportunities] = useState<Record<string, boolean>>({});
+  
+  // Request deduplication with caching
+  const [pendingRequests] = useState(new Map<string, Promise<any>>());
+  
+  // Deduplicate concurrent API requests
+  const makeDeduplicatedRequest = async <T,>(key: string, requestFn: () => Promise<T>): Promise<T> => {
+    if (pendingRequests.has(key)) {
+      return pendingRequests.get(key) as Promise<T>;
+    }
+    
+    const promise = requestFn().finally(() => {
+      pendingRequests.delete(key);
+    });
+    
+    pendingRequests.set(key, promise);
+    return promise;
+  };
 
   // Refresh opportunities using quick-scan endpoints for all strategies
   const refreshAllOpportunities = async () => {
@@ -227,30 +244,45 @@ export const StrategyProvider: React.FC<StrategyProviderProps> = ({ children }) 
       
       // Distribute opportunities to strategies based on strategy_type
       allOpportunities.forEach((opp: any) => {
-        // Map opportunity strategy_type directly to strategy ID
-        // The backend now provides strategy_type that matches strategy IDs
-        let targetStrategyId = opp.strategy_type || 'IronCondor'; // default fallback
-        
-        // If the exact strategy doesn't exist, try to find a matching one
-        if (!opportunitiesByStrategy[targetStrategyId]) {
-          // Try to map common strategy types to existing strategies
-          const strategyMapping: Record<string, string> = {
-            'high_probability': 'RSICouponStrategy',
-            'quick_scalp': 'SingleOption', 
-            'swing_trade': 'CoveredCall',
-            'volatility_play': 'IronCondor',
-            'iron_condor': 'IronCondor',
-            'put_spread': 'CreditSpread',
-            'covered_call': 'CoveredCall',
-            'theta_decay': 'ThetaCropWeekly',
-            'momentum': 'VerticalSpread',
-            'protective': 'ProtectivePut',
-            'neutral': 'ButterflySpread'
-          };
+        // CRITICAL FIX: Map backend strategy_type (SCREAMING_SNAKE_CASE) to frontend strategy IDs (PascalCase)
+        const strategyMapping: Record<string, string> = {
+          // Exact mapping from backend strategy_type to frontend strategy ID
+          'PROTECTIVE_PUT': 'ProtectivePut',
+          'STRANGLE': 'Strangle', 
+          'STRADDLE': 'Straddle',
+          'RSI_COUPON': 'RSICouponStrategy',
+          'THETA_HARVESTING': 'ThetaCropWeekly',
+          'BUTTERFLY': 'Butterfly',
+          'NAKED_OPTION': 'SingleOption',
+          'COLLAR': 'Collar',
+          'COVERED_CALL': 'CoveredCall',
+          'VERTICAL_SPREAD': 'VerticalSpread',
+          'CALENDAR_SPREAD': 'CalendarSpread',
+          'IRON_CONDOR': 'IronCondor',
+          'CREDIT_SPREAD': 'CreditSpread',
           
-          targetStrategyId = strategyMapping[targetStrategyId.toLowerCase()] || 
-                           currentStrategies.find(s => s.status === 'active')?.id || 
-                           'IronCondor';
+          // Legacy mappings for backward compatibility
+          'high_probability': 'RSICouponStrategy',
+          'quick_scalp': 'SingleOption', 
+          'swing_trade': 'CoveredCall',
+          'volatility_play': 'IronCondor',
+          'iron_condor': 'IronCondor',
+          'put_spread': 'CreditSpread',
+          'covered_call': 'CoveredCall',
+          'theta_decay': 'ThetaCropWeekly',
+          'momentum': 'VerticalSpread',
+          'protective': 'ProtectivePut',
+          'neutral': 'Butterfly'
+        };
+        
+        let targetStrategyId = strategyMapping[opp.strategy_type] || 
+                              strategyMapping[opp.strategy_type?.toLowerCase()] ||
+                              opp.strategy_type; // fallback to exact match
+        
+        // If still no match found, try to find any active strategy
+        if (!opportunitiesByStrategy[targetStrategyId]) {
+          targetStrategyId = currentStrategies.find(s => s.status === 'active')?.id || 'IronCondor';
+          console.warn(`No strategy mapping found for '${opp.strategy_type}', using fallback: ${targetStrategyId}`);
         }
         
         if (opportunitiesByStrategy[targetStrategyId]) {
@@ -267,17 +299,18 @@ export const StrategyProvider: React.FC<StrategyProviderProps> = ({ children }) 
   };
 
   const refreshStrategies = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      // First get basic strategy metadata
-      const strategiesResponse = await fetch('/api/strategies/');
-      if (!strategiesResponse.ok) {
-        throw new Error(`Failed to fetch strategies: ${strategiesResponse.statusText}`);
-      }
-      
-      const strategiesData = await strategiesResponse.json();
+    return makeDeduplicatedRequest('refresh-strategies', async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // First get basic strategy metadata
+        const strategiesResponse = await fetch('/api/strategies/');
+        if (!strategiesResponse.ok) {
+          throw new Error(`Failed to fetch strategies: ${strategiesResponse.statusText}`);
+        }
+        
+        const strategiesData = await strategiesResponse.json();
       
       // Enhanced strategy metadata with proper category mapping
       const enhancedStrategies = strategiesData.strategies.map((strategy: any) => ({
@@ -304,13 +337,14 @@ export const StrategyProvider: React.FC<StrategyProviderProps> = ({ children }) 
       // Now load all opportunities and distribute them to strategies
       await loadAllOpportunities();
       
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load strategies';
-      setError(errorMessage);
-      console.error('Error fetching strategies:', err);
-    } finally {
-      setLoading(false);
-    }
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Failed to load strategies';
+        setError(errorMessage);
+        console.error('Error fetching strategies:', err);
+      } finally {
+        setLoading(false);
+      }
+    });
   };
 
   const getStrategyOpportunities = async (strategyId: string, symbol: string = 'SPY') => {
@@ -348,18 +382,82 @@ export const StrategyProvider: React.FC<StrategyProviderProps> = ({ children }) 
     return categoryOpportunities.sort((a, b) => (b.score || 0) - (a.score || 0));
   };
 
-  // Load strategies on mount
+  // Load strategies on mount with immediate parallel data loading
   useEffect(() => {
-    refreshStrategies();
+    const initializeApp = async () => {
+      try {
+        setLoading(true);
+        
+        // Load strategies and opportunities in parallel
+        const [strategiesResponse, opportunitiesResponse] = await Promise.allSettled([
+          fetch('/api/strategies/'),
+          fetch('/api/trading/opportunities')
+        ]);
+        
+        // Process strategies
+        let strategiesData: any = null;
+        if (strategiesResponse.status === 'fulfilled' && strategiesResponse.value.ok) {
+          strategiesData = await strategiesResponse.value.json();
+          const enhancedStrategies = strategiesData.strategies.map((strategy: any) => ({
+            ...strategy,
+            category: strategy.category || getCategoryFromStrategyType(strategy.id),
+            status: (strategy.enabled === true) ? 'active' as const : 'inactive' as const,
+            last_updated: new Date().toISOString(),
+            performance_stats: {},
+            config: {
+              min_dte: strategy.min_dte,
+              max_dte: strategy.max_dte,
+              risk_level: strategy.risk_level,
+              enabled: strategy.enabled
+            }
+          }));
+          
+          const uniqueCategories = [...new Set(enhancedStrategies.map(s => s.category))];
+          setStrategies(enhancedStrategies);
+          setCategories(uniqueCategories);
+        }
+        
+        // Process opportunities in parallel
+        if (opportunitiesResponse.status === 'fulfilled' && opportunitiesResponse.value.ok) {
+          const oppData = await opportunitiesResponse.value.json();
+          const allOpportunities = oppData.opportunities || [];
+          
+          // Distribute opportunities to strategies
+          const opportunitiesByStrategy: Record<string, OpportunityData> = {};
+          const currentStrategies = strategiesData ? strategiesData.strategies : [];
+          
+          currentStrategies.forEach((strategy: any) => {
+            opportunitiesByStrategy[strategy.id] = {
+              strategy_id: strategy.id,
+              strategy_name: strategy.name,
+              opportunities: [],
+              count: 0,
+              generated_at: new Date().toISOString(),
+              market_conditions: {}
+            };
+          });
+          
+          allOpportunities.forEach((opp: any) => {
+            const targetStrategyId = opp.strategy_type || 'IronCondor';
+            if (opportunitiesByStrategy[targetStrategyId]) {
+              opportunitiesByStrategy[targetStrategyId].opportunities.push(opp);
+              opportunitiesByStrategy[targetStrategyId].count += 1;
+            }
+          });
+          
+          setOpportunitiesByStrategy(opportunitiesByStrategy);
+        }
+        
+      } catch (err) {
+        console.error('Error initializing app:', err);
+        setError(err instanceof Error ? err.message : 'Failed to initialize');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    initializeApp();
   }, []);
-
-  // Auto-load opportunities for active strategies
-  useEffect(() => {
-    if (strategies.length > 0) {
-      // Load all opportunities once when strategies are loaded
-      loadAllOpportunities();
-    }
-  }, [strategies]);
 
   const value: StrategyContextType = {
     strategies,

@@ -1,9 +1,9 @@
 
-import React from 'react';
+import React, { memo } from 'react';
 import TradingDashboard from '@/components/TradingDashboard';
 import { TradingErrorBoundary } from '@/components/TradingErrorBoundary';
 
-const Index = () => {
+const Index = memo(() => {
   console.log('🎯 Index component rendering...');
   
   return (
@@ -13,6 +13,8 @@ const Index = () => {
       </TradingErrorBoundary>
     </div>
   );
-};
+});
+
+Index.displayName = 'Index';
 
 export default Index;

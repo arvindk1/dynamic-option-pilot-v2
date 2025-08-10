@@ -37,6 +37,114 @@ class JSONStrategyPlugin(BaseStrategyPlugin):
         super().__init__(config, strategy_config)
         self.json_config = json_config
         self.engine_registry = engine_registry
+    
+    def _round_to_standard_strike(self, price: float) -> float:
+        """Round price to standard option strike intervals"""
+        if price < 5:
+            # Round to nearest $0.50 for stocks under $5
+            return round(price * 2) / 2
+        elif price < 25:
+            # Round to nearest $1.00 for stocks $5-$25
+            return round(price)
+        elif price < 200:
+            # Round to nearest $2.50 for stocks $25-$200
+            return round(price / 2.5) * 2.5
+        else:
+            # Round to nearest $5.00 for stocks over $200
+            return round(price / 5) * 5
+    
+    def _calculate_proper_dte(self, target_dte: int) -> int:
+        """Calculate proper days to expiration for options"""
+        # Add some realistic variation around target DTE
+        import random
+        variation = random.randint(-3, 7)  # -3 to +7 days variation
+        return max(1, target_dte + variation)
+    
+    def _calculate_expiration_date(self, target_dte: int) -> str:
+        """Calculate realistic expiration date for options"""
+        from datetime import datetime, timedelta
+        
+        actual_dte = self._calculate_proper_dte(target_dte)
+        expiration_date = datetime.now() + timedelta(days=actual_dte)
+        
+        # Round to Friday (standard options expiration)
+        days_ahead = expiration_date.weekday()
+        if days_ahead < 4:  # Monday=0, Tuesday=1, ... Thursday=3
+            days_to_friday = 4 - days_ahead
+        else:  # Friday=4, Saturday=5, Sunday=6
+            days_to_friday = (4 - days_ahead) % 7
+        
+        friday_expiration = expiration_date + timedelta(days=days_to_friday)
+        return friday_expiration.strftime('%Y-%m-%d')
+    
+    def _calculate_delta(self, spot_price: float, strike_price: float, strategy_type: str, variant: int) -> float:
+        """Calculate realistic delta for option positions"""
+        if not strike_price:
+            return 0.0
+        
+        # Simple delta approximation based on moneyness
+        moneyness = spot_price / strike_price
+        
+        if strategy_type in ['PROTECTIVE_PUT']:
+            # Protective puts are typically OTM puts with negative delta
+            return round(-0.15 - variant * 0.03, 3)
+        elif strategy_type in ['STRANGLE', 'STRADDLE']:
+            # Net delta for strangles/straddles (close to neutral)
+            return round(0.05 - variant * 0.02, 3)
+        elif 'CALL' in strategy_type:
+            # Call strategies have positive delta
+            delta = 0.30 + (moneyness - 1) * 0.50
+            return round(max(0.05, min(0.95, delta)), 3)
+        else:
+            # Default delta
+            delta = 0.25 + (moneyness - 1) * 0.30
+            return round(max(-0.95, min(0.95, delta)), 3)
+    
+    def _calculate_gamma(self, spot_price: float, strike_price: float, strategy_type: str) -> float:
+        """Calculate realistic gamma for option positions"""
+        if not strike_price:
+            return 0.0
+        
+        # Gamma is highest ATM and decreases as we move away
+        moneyness = abs(spot_price / strike_price - 1)
+        max_gamma = 0.015
+        
+        # Gamma decreases exponentially as we move away from ATM
+        gamma = max_gamma * (1 - moneyness * 3)
+        return round(max(0.001, gamma), 4)
+    
+    def _calculate_theta(self, spot_price: float, strike_price: float, strategy_type: str, variant: int) -> float:
+        """Calculate realistic theta (time decay) for option positions"""
+        if not strike_price:
+            return 0.0
+        
+        # Theta is typically negative (time decay hurts long positions)
+        base_theta = -0.08 - variant * 0.02
+        
+        if strategy_type in ['PROTECTIVE_PUT']:
+            # Long puts lose money to time decay
+            return round(base_theta * 1.2, 3)
+        elif strategy_type in ['STRANGLE', 'STRADDLE']:
+            # Long straddles/strangles lose more to time decay
+            return round(base_theta * 2.0, 3)
+        else:
+            return round(base_theta, 3)
+    
+    def _calculate_vega(self, spot_price: float, strike_price: float, strategy_type: str) -> float:
+        """Calculate realistic vega for option positions"""
+        if not strike_price:
+            return 0.0
+        
+        # Vega is positive for long options, negative for short
+        base_vega = 0.12
+        
+        if strategy_type in ['PROTECTIVE_PUT']:
+            return round(base_vega * 0.8, 3)
+        elif strategy_type in ['STRANGLE', 'STRADDLE']:
+            # Long straddles/strangles benefit from volatility increases
+            return round(base_vega * 1.5, 3)
+        else:
+            return round(base_vega, 3)
         self._performance_stats = {
             'total_scans': 0,
             'opportunities_generated': 0,
@@ -225,13 +333,13 @@ class JSONStrategyPlugin(BaseStrategyPlugin):
         
         # Generate opportunities based on strategy type
         for i in range(min(max_per_symbol, 3)):  # Limit to 3 per symbol
-            opportunity = await self._create_opportunity(symbol, quote, config, i)
+            opportunity = await self._create_opportunity(symbol, quote, config, i, data_provider)
             if opportunity:
                 opportunities.append(opportunity)
         
         return opportunities
     
-    async def _create_opportunity(self, symbol: str, quote, config: Dict[str, Any], variant: int = 0) -> Optional[StrategyOpportunity]:
+    async def _create_opportunity(self, symbol: str, quote, config: Dict[str, Any], variant: int = 0, data_provider: IDataProvider = None) -> Optional[StrategyOpportunity]:
         """Create a single opportunity based on JSON configuration."""
         try:
             position_params = config.get('position_parameters', {})
@@ -240,8 +348,8 @@ class JSONStrategyPlugin(BaseStrategyPlugin):
             # Generate realistic option parameters based on strategy type
             if strategy_type == 'IRON_CONDOR':
                 delta_target = position_params.get('delta_target', 0.20)
-                short_strike_call = quote.price * (1 + delta_target + variant * 0.02)
-                short_strike_put = quote.price * (1 - delta_target - variant * 0.02)
+                short_strike_call = self._round_to_standard_strike(quote.price * (1 + delta_target + variant * 0.02))
+                short_strike_put = self._round_to_standard_strike(quote.price * (1 - delta_target - variant * 0.02))
                 wing_width = position_params.get('wing_widths', [5, 10])[variant % 2]
                 
                 premium = 2.0 + variant * 0.5
@@ -250,8 +358,8 @@ class JSONStrategyPlugin(BaseStrategyPlugin):
             elif strategy_type in ['THETA_HARVESTING', 'COVERED_CALL']:
                 # Theta harvesting strategies - sell options to collect premium
                 delta_target = position_params.get('delta_target', 0.20)
-                short_strike_call = quote.price * (1 + delta_target + variant * 0.02)
-                short_strike_put = quote.price * (1 - delta_target - variant * 0.02)
+                short_strike_call = self._round_to_standard_strike(quote.price * (1 + delta_target + variant * 0.02))
+                short_strike_put = self._round_to_standard_strike(quote.price * (1 - delta_target - variant * 0.02))
                 
                 premium = 1.8 + variant * 0.4
                 max_loss = 500 + variant * 200
@@ -259,7 +367,7 @@ class JSONStrategyPlugin(BaseStrategyPlugin):
             elif strategy_type == 'RSI_COUPON':
                 delta_range = position_params.get('preferred_delta_range', [0.25, 0.40])
                 delta = delta_range[0] + (delta_range[1] - delta_range[0]) * variant / 2
-                short_strike_put = quote.price * (1 - delta)
+                short_strike_put = self._round_to_standard_strike(quote.price * (1 - delta))
                 
                 premium = 1.5 + variant * 0.3
                 max_loss = 500 + variant * 100
@@ -268,7 +376,7 @@ class JSONStrategyPlugin(BaseStrategyPlugin):
             elif strategy_type in ['PUT_SPREAD', 'CREDIT_SPREAD', 'VERTICAL_SPREAD']:
                 delta_targets = position_params.get('delta_targets', [0.10, 0.15, 0.20])
                 delta = delta_targets[variant % len(delta_targets)]
-                short_strike_put = quote.price * (1 - delta)
+                short_strike_put = self._round_to_standard_strike(quote.price * (1 - delta))
                 
                 premium = 1.2 + variant * 0.4
                 max_loss = 400 + variant * 150
@@ -277,8 +385,8 @@ class JSONStrategyPlugin(BaseStrategyPlugin):
             elif strategy_type in ['STRADDLE', 'STRANGLE']:
                 # Volatility plays - buy both calls and puts
                 atm_strike = quote.price
-                short_strike_call = atm_strike * (1 + 0.05 * variant)
-                short_strike_put = atm_strike * (1 - 0.05 * variant) if strategy_type == 'STRANGLE' else atm_strike
+                short_strike_call = self._round_to_standard_strike(atm_strike * (1 + 0.05 * variant))
+                short_strike_put = self._round_to_standard_strike(atm_strike * (1 - 0.05 * variant)) if strategy_type == 'STRANGLE' else self._round_to_standard_strike(atm_strike)
                 
                 premium = 3.5 + variant * 0.8  # Higher premium for volatility plays
                 max_loss = premium * 100
@@ -297,7 +405,7 @@ class JSONStrategyPlugin(BaseStrategyPlugin):
                 # Protective put - insurance for long stock position
                 # Long 100 shares + Long 1 Put for downside protection
                 protection_level = position_params.get('protection_level', 0.95)  # 95% protection level
-                long_strike_put = quote.price * protection_level
+                long_strike_put = self._round_to_standard_strike(quote.price * protection_level)
                 
                 # Premium PAID for put protection (insurance cost)
                 premium_paid = 2.5 + variant * 0.8  # Cost to buy protection
@@ -315,8 +423,8 @@ class JSONStrategyPlugin(BaseStrategyPlugin):
             elif strategy_type in ['COLLAR', 'CALENDAR_SPREAD']:
                 # Collar or calendar spread strategies
                 delta_target = position_params.get('delta_target', 0.20)
-                short_strike_call = quote.price * (1 + delta_target + variant * 0.02)
-                short_strike_put = quote.price * (1 - delta_target - variant * 0.02)
+                short_strike_call = self._round_to_standard_strike(quote.price * (1 + delta_target + variant * 0.02))
+                short_strike_put = self._round_to_standard_strike(quote.price * (1 - delta_target - variant * 0.02))
                 
                 premium = 1.3 + variant * 0.4
                 max_loss = 400 + variant * 150
@@ -326,10 +434,10 @@ class JSONStrategyPlugin(BaseStrategyPlugin):
                 delta_target = position_params.get('delta_target', 0.30)
                 # Randomly choose call or put
                 if (hash(f"{symbol}_{variant}") % 2) == 0:
-                    short_strike_call = quote.price * (1 + delta_target + variant * 0.02)
+                    short_strike_call = self._round_to_standard_strike(quote.price * (1 + delta_target + variant * 0.02))
                     short_strike_put = None
                 else:
-                    short_strike_put = quote.price * (1 - delta_target - variant * 0.02)
+                    short_strike_put = self._round_to_standard_strike(quote.price * (1 - delta_target - variant * 0.02))
                     short_strike_call = None
                 
                 premium = 2.5 + variant * 0.6
@@ -337,7 +445,7 @@ class JSONStrategyPlugin(BaseStrategyPlugin):
                 
             else:
                 # Generic opportunity
-                short_strike_put = quote.price * 0.85
+                short_strike_put = self._round_to_standard_strike(quote.price * 0.85)
                 premium = 2.0 + variant * 0.5
                 max_loss = 600 + variant * 100
                 short_strike_call = None
@@ -347,15 +455,22 @@ class JSONStrategyPlugin(BaseStrategyPlugin):
             expected_value = premium * 100 * probability_profit - max_loss * (1 - probability_profit)
             
             # Create opportunity
+            # For Greeks calculation, use the appropriate strike based on strategy type
+            if strategy_type == 'PROTECTIVE_PUT' and 'long_strike_put' in locals():
+                greek_calculation_strike = long_strike_put
+            else:
+                greek_calculation_strike = short_strike_call or short_strike_put
+            
             opportunity = StrategyOpportunity(
                 id=f"json_{self.json_config.strategy_id}_{symbol}_{variant}_{int(datetime.now().timestamp())}",
                 symbol=symbol,
                 strategy_type=strategy_type,
                 strategy_id=self.json_config.strategy_id,
+                universe=config.get('universe', {}).get('universe_name', 'default'),  # CRITICAL FIX: Add universe attribute
                 underlying_price=quote.price,
                 
                 # Option details - handle Protective Put specially
-                short_strike=short_strike_put if short_strike_put else short_strike_call,
+                short_strike=long_strike_put if strategy_type == 'PROTECTIVE_PUT' and 'long_strike_put' in locals() else (short_strike_put if short_strike_put else short_strike_call),
                 long_strike=long_strike_put if strategy_type == 'PROTECTIVE_PUT' and 'long_strike_put' in locals() else (
                     (short_strike_put - 10) if short_strike_put else ((short_strike_call + 10) if short_strike_call else None)
                 ),
@@ -366,11 +481,11 @@ class JSONStrategyPlugin(BaseStrategyPlugin):
                 probability_profit=probability_profit,
                 expected_value=expected_value,
                 
-                # Greeks (simulated)
-                delta=0.1 - variant * 0.05,
-                gamma=0.02,
-                theta=-0.5,
-                vega=0.15,
+                # Greeks (from real options data - will be populated by _get_real_options_data)
+                delta=0.0,  # Will be updated with real data
+                gamma=0.0,  # Will be updated with real data
+                theta=0.0,  # Will be updated with real data
+                vega=0.0,   # Will be updated with real data
                 
                 # Metadata - Use proper options expiration dates
                 days_to_expiration=self._calculate_proper_dte(position_params.get('target_dtes', [30])[0]),
@@ -380,11 +495,83 @@ class JSONStrategyPlugin(BaseStrategyPlugin):
                 liquidity_score=8.0 + variant * 0.3
             )
             
+            # Populate real Greeks data from options chain
+            await self._populate_real_greeks(opportunity, data_provider)
+            
             return opportunity
             
         except Exception as e:
             logger.error(f"Error creating opportunity for {symbol}: {e}")
             return None
+    
+    async def _populate_real_greeks(self, opportunity: StrategyOpportunity, data_provider: IDataProvider):
+        """Populate opportunity with real Greeks data from options chain."""
+        try:
+            # Skip if no strike prices
+            if not (opportunity.short_strike or opportunity.long_strike):
+                return
+            
+            # Get expiration date for options chain lookup
+            expiration_date = opportunity.expiration
+            if not expiration_date:
+                return
+            
+            # Fetch real options chain data
+            options_chain = await data_provider.get_options_chain(
+                opportunity.symbol, 
+                expiration=expiration_date
+            )
+            
+            # Find the specific option contracts for our strikes
+            calls_data = options_chain.get('calls', [])
+            puts_data = options_chain.get('puts', [])
+            
+            # Look for matching strikes and get Greeks
+            target_strikes = []
+            if opportunity.short_strike:
+                target_strikes.append(opportunity.short_strike)
+            if opportunity.long_strike and opportunity.long_strike != opportunity.short_strike:
+                target_strikes.append(opportunity.long_strike)
+            
+            total_delta = 0.0
+            total_gamma = 0.0  
+            total_theta = 0.0
+            total_vega = 0.0
+            contracts_found = 0
+            
+            for strike in target_strikes:
+                # Check calls
+                for call in calls_data:
+                    if abs(call['strike'] - strike) < 0.01:  # Allow small rounding differences
+                        total_delta += call.get('delta', 0.0)
+                        total_gamma += call.get('gamma', 0.0)
+                        total_theta += call.get('theta', 0.0)
+                        total_vega += call.get('vega', 0.0)
+                        contracts_found += 1
+                        break
+                
+                # Check puts
+                for put in puts_data:
+                    if abs(put['strike'] - strike) < 0.01:  # Allow small rounding differences
+                        total_delta += put.get('delta', 0.0)
+                        total_gamma += put.get('gamma', 0.0)
+                        total_theta += put.get('theta', 0.0)
+                        total_vega += put.get('vega', 0.0)
+                        contracts_found += 1
+                        break
+            
+            # Update opportunity with real Greeks (average if multiple contracts)
+            if contracts_found > 0:
+                opportunity.delta = round(total_delta / contracts_found, 4)
+                opportunity.gamma = round(total_gamma / contracts_found, 4)
+                opportunity.theta = round(total_theta / contracts_found, 4)
+                opportunity.vega = round(total_vega / contracts_found, 4)
+                
+                logger.debug(f"Updated {opportunity.symbol} Greeks from real data: Delta={opportunity.delta}, Gamma={opportunity.gamma}, Theta={opportunity.theta}, Vega={opportunity.vega}")
+            
+        except Exception as e:
+            logger.warning(f"Could not fetch real Greeks for {opportunity.symbol}: {e}. Using defaults.")
+            # Keep the default 0.0 values if real data unavailable
     
     def _apply_json_scoring(self, opportunities: List[StrategyOpportunity], config: Dict[str, Any]) -> List[StrategyOpportunity]:
         """Apply JSON-defined scoring to opportunities."""

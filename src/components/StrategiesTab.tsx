@@ -1,6 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Play, Settings, TrendingUp, Clock, CheckCircle } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
+import JsonDrivenForm from './JsonDrivenForm';
+import UniversalStrategyForm from './UniversalStrategyForm';
+import { get, set, cloneDeep } from 'lodash';
+
+// System strategy interface (now includes complete configuration)
+interface SystemStrategy {
+  id: string;
+  name: string;
+  description: string;
+  risk_level: string;
+  category: string;
+  enabled: boolean;
+  
+  // Complete configuration including ui_metadata
+  complete_config?: any;
+  has_ui_metadata?: boolean;
+  ui_metadata_fields?: number;
+  
+  // Key parameters for preview
+  dte_range?: [number, number];
+  max_positions?: number;
+  file_name?: string;
+}
 
 // Strategy sandbox interfaces
 interface StrategyConfig {
@@ -36,12 +59,16 @@ export const StrategiesTab: React.FC = () => {
   const { theme } = useTheme();
   const [strategies, setStrategies] = useState<StrategyConfig[]>([]);
   const [selectedStrategy, setSelectedStrategy] = useState<StrategyConfig | null>(null);
+  const [availableStrategies, setAvailableStrategies] = useState<SystemStrategy[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
+  const [showCreateView, setShowCreateView] = useState(false);
+  const [isLoadingStrategies, setIsLoadingStrategies] = useState(true);
 
-  // Load user's sandbox strategies
+  // Load user's sandbox strategies and available base strategies
   useEffect(() => {
     loadStrategies();
+    loadAvailableStrategies();
   }, []);
 
   const loadStrategies = async () => {
@@ -64,9 +91,33 @@ export const StrategiesTab: React.FC = () => {
     }
   };
 
+  const loadAvailableStrategies = async () => {
+    try {
+      setIsLoadingStrategies(true);
+      // Use the new complete endpoint to get ui_metadata
+      const response = await fetch('/api/strategies/complete');
+      if (response.ok) {
+        const data = await response.json();
+        setAvailableStrategies(data.strategies);
+        console.log(`Loaded ${data.strategies.length} strategies, ${data.has_ui_metadata_count} with ui_metadata`);
+      }
+    } catch (error) {
+      console.error('Error loading available strategies:', error);
+    } finally {
+      setIsLoadingStrategies(false);
+    }
+  };
+
   const createNewStrategy = () => {
-    setIsCreating(true);
-    // TODO: Open create strategy modal
+    setShowCreateView(true);
+    setSelectedStrategy(null);
+  };
+
+  const handleStrategyCreated = () => {
+    // Reload strategies when a new one is created
+    loadStrategies();
+    setShowCreateView(false);
+    setIsCreating(false);
   };
 
   const themeClasses = {
@@ -153,9 +204,23 @@ export const StrategiesTab: React.FC = () => {
 
         {/* Main Content Area */}
         <div className="flex-1 flex">
-          {selectedStrategy ? (
+          {(showCreateView || !selectedStrategy) ? (
+              <EmptyStrategyView 
+                availableStrategies={availableStrategies}
+                onCreateNew={handleStrategyCreated}
+                showBackButton={showCreateView && strategies.length > 0}
+                isLoadingStrategies={isLoadingStrategies}
+                onBack={() => {
+                  setShowCreateView(false);
+                  if (strategies.length > 0) {
+                    setSelectedStrategy(strategies[0]);
+                  }
+                }}
+              />
+          ) : (
             <StrategyEditor
               strategy={selectedStrategy}
+              availableStrategies={availableStrategies}
               onStrategyUpdate={(updated) => {
                 setStrategies(prev => 
                   prev.map(s => s.id === updated.id ? updated : s)
@@ -163,8 +228,6 @@ export const StrategiesTab: React.FC = () => {
                 setSelectedStrategy(updated);
               }}
             />
-          ) : (
-            <EmptyStrategyView onCreateNew={createNewStrategy} />
           )}
         </div>
       </div>
@@ -238,8 +301,9 @@ const StrategyCard: React.FC<{
 // Strategy editor component (right side)
 const StrategyEditor: React.FC<{
   strategy: StrategyConfig;
+  availableStrategies: SystemStrategy[];
   onStrategyUpdate: (strategy: StrategyConfig) => void;
-}> = ({ strategy, onStrategyUpdate }) => {
+}> = ({ strategy, availableStrategies, onStrategyUpdate }) => {
   const [isRunningTest, setIsRunningTest] = useState(false);
   const [lastTestResult, setLastTestResult] = useState<TestResult | null>(null);
   const [currentStrategy, setCurrentStrategy] = useState<StrategyConfig>(strategy);
@@ -249,39 +313,11 @@ const StrategyEditor: React.FC<{
     setCurrentStrategy(strategy);
   }, [strategy]);
 
-  // Handle parameter changes
-  const handleParameterChange = async (parameter: string, value: any) => {
-    const updatedStrategy = {
-      ...currentStrategy,
-      config_data: {
-        ...currentStrategy.config_data,
-        // Apply the parameter change to the config_data
-        [parameter]: value
-      }
-    };
-    
-    setCurrentStrategy(updatedStrategy);
-    
-    // Persist changes to backend
-    try {
-      const response = await fetch(`/api/sandbox/strategies/${strategy.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          config_data: updatedStrategy.config_data
-        })
-      });
-      
-      if (response.ok) {
-        onStrategyUpdate(updatedStrategy);
-      }
-    } catch (error) {
-      console.error('Error saving parameter changes:', error);
-    }
-  };
+  // Find the base strategy to check for ui_metadata
+  const baseStrategy = availableStrategies.find(s => s.id === strategy.strategy_id);
+  const hasUIMetadata = baseStrategy?.has_ui_metadata && baseStrategy?.complete_config?.ui_metadata;
 
+  // Run a test for this sandbox strategy configuration
   const runStrategyTest = async () => {
     try {
       setIsRunningTest(true);
@@ -311,7 +347,51 @@ const StrategyEditor: React.FC<{
     }
   };
 
+  // Handle parameter changes
+  const handleParameterChange = async (parameter: string, value: any) => {
+    // Handle nested parameter paths like 'trading.target_dte_range'
+    const keys = parameter.split('.');
+    const newConfigData = { ...currentStrategy.config_data };
+    let current = newConfigData;
+    
+    // Navigate to the parent object
+    for (let i = 0; i < keys.length - 1; i++) {
+      if (!current[keys[i]]) current[keys[i]] = {};
+      current = current[keys[i]];
+    }
+    
+    // Set the final value
+    current[keys[keys.length - 1]] = value;
+    
+    const updatedStrategy = {
+      ...currentStrategy,
+      config_data: newConfigData
+    };
+    
+    setCurrentStrategy(updatedStrategy);
+    
+    // Persist changes to backend
+    try {
+      const response = await fetch(`/api/sandbox/strategies/${strategy.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          config_data: updatedStrategy.config_data
+        })
+      });
+      
+      if (response.ok) {
+        onStrategyUpdate(updatedStrategy);
+      }
+    } catch (error) {
+      console.error('Error saving parameter changes:', error);
+    }
+  };
+
   const { theme } = useTheme();
+  const [isAIAssistantExpanded, setIsAIAssistantExpanded] = useState(true);
   
   const themeClasses = {
     configPanel: theme === 'dark' 
@@ -329,7 +409,7 @@ const StrategyEditor: React.FC<{
   return (
     <div className="flex-1 flex">
       {/* Strategy Configuration Panel (Left) */}
-      <div className={`flex-1 ${themeClasses.configPanel} border-r`}>
+      <div className={`${isAIAssistantExpanded ? 'flex-1' : 'flex-[2]'} ${themeClasses.configPanel} border-r transition-all duration-300`}>
         <div className="p-6">
           <div className="flex items-center justify-between mb-6">
             <div>
@@ -337,6 +417,22 @@ const StrategyEditor: React.FC<{
               <p className={themeClasses.text.secondary}>{strategy.strategy_id}</p>
             </div>
             <div className="flex gap-2">
+              {/* AI Assistant Toggle */}
+              <button
+                onClick={() => setIsAIAssistantExpanded(!isAIAssistantExpanded)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  isAIAssistantExpanded 
+                    ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                    : 'bg-blue-100 text-blue-800 hover:bg-blue-200 animate-pulse'
+                }`}
+                title={isAIAssistantExpanded ? 'Hide AI Assistant' : 'Show AI Assistant'}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+                {isAIAssistantExpanded ? 'Hide' : 'AI Help'}
+              </button>
+              
               <button
                 onClick={runStrategyTest}
                 disabled={isRunningTest}
@@ -357,9 +453,10 @@ const StrategyEditor: React.FC<{
             </div>
           </div>
 
-          {/* Strategy Parameters */}
-          <StrategyParametersPanel 
-            strategy={currentStrategy} 
+          {/* Universal Strategy Parameters */}
+          <UniversalStrategyForm 
+            strategy={currentStrategy}
+            baseStrategy={baseStrategy}
             onParameterChange={handleParameterChange}
           />
 
@@ -370,9 +467,11 @@ const StrategyEditor: React.FC<{
         </div>
       </div>
 
-      {/* AI Assistant Panel (Right) */}
-      <div className={`w-80 ${themeClasses.aiPanel} border-l`}>
-        <AIAssistantPanel strategy={strategy} />
+      {/* AI Assistant Panel (Right) - Collapsible */}
+      <div className={`${isAIAssistantExpanded ? 'w-80' : 'w-0'} ${themeClasses.aiPanel} border-l transition-all duration-300 overflow-hidden`}>
+        {isAIAssistantExpanded && (
+          <AIAssistantPanel strategy={strategy} />
+        )}
       </div>
     </div>
   );
@@ -403,14 +502,19 @@ const StrategyParametersPanel: React.FC<{
           
           // Set current universe if it matches
           const currentSymbols = strategy.config_data.universe?.primary_symbols || [];
+          console.log('Current symbols:', currentSymbols);
+          console.log('Available universes:', Object.keys(data.universes));
+          
           if (currentSymbols.length > 0) {
             // Try to match current symbols to a universe
             const matchingUniverse = Object.keys(data.universes).find(key => {
               // Simple heuristic - if first symbol matches common universe patterns
               if (key === 'mag7' && currentSymbols.includes('AAPL')) return true;
               if (key === 'etfs' && currentSymbols.includes('SPY')) return true;
+              if (key === 'thetacrop' && currentSymbols.includes('QQQ')) return true;
               return false;
             });
+            console.log('Matching universe:', matchingUniverse);
             if (matchingUniverse) setSelectedUniverse(matchingUniverse);
           }
         }
@@ -474,8 +578,8 @@ const StrategyParametersPanel: React.FC<{
       ? 'border-gray-600 bg-gray-700 text-white focus:ring-blue-400 focus:border-blue-400' 
       : 'border-gray-300 bg-white text-gray-900 focus:ring-blue-500 focus:border-blue-500',
     select: theme === 'dark'
-      ? 'border-gray-600 bg-gray-700 text-white focus:ring-blue-400'
-      : 'border-gray-300 bg-white text-gray-900 focus:ring-blue-500'
+      ? 'border-gray-600 bg-gray-700 text-white focus:ring-blue-400 appearance-none cursor-pointer'
+      : 'border-gray-300 bg-white text-gray-900 focus:ring-blue-500 appearance-none cursor-pointer'
   };
 
   return (
@@ -483,7 +587,10 @@ const StrategyParametersPanel: React.FC<{
       <div className="flex items-center justify-between mb-4">
         <h3 className={`font-medium ${themeClasses.title}`}>Strategy Parameters</h3>
         <button
-          onClick={() => setIsEditing(!isEditing)}
+          onClick={() => {
+            console.log('Toggle editing mode from', isEditing, 'to', !isEditing);
+            setIsEditing(!isEditing);
+          }}
           className={`px-3 py-1 text-xs rounded-lg transition-colors ${
             isEditing 
               ? 'bg-green-100 text-green-800 hover:bg-green-200'
@@ -495,28 +602,50 @@ const StrategyParametersPanel: React.FC<{
       </div>
       
       <div className={`space-y-4 ${themeClasses.parametersBg} p-4 rounded-lg`}>
-        {/* Universe Selection */}
-        <div>
-          <h4 className={`font-medium text-sm ${themeClasses.sectionTitle} mb-2`}>Trading Universe</h4>
-          {isEditing ? (
-            <div className="space-y-2">
+        {/* Universe Selection - Always Visible and Prominent */}
+        <div className="border-2 border-blue-200 dark:border-blue-700 rounded-lg p-3 bg-blue-50 dark:bg-blue-900/20">
+          <div className="flex items-center gap-2 mb-3">
+            <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <h4 className={`font-medium text-sm ${themeClasses.sectionTitle}`}>Trading Universe</h4>
+            <span className="px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded-full font-medium">Required</span>
+          </div>
+          
+          <div className="space-y-2">
+            <div className="relative">
               <select
                 value={selectedUniverse}
                 onChange={(e) => handleUniverseChange(e.target.value)}
-                className={`block w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 ${themeClasses.select}`}
+                className={`block w-full px-3 py-2 pr-10 border-2 border-blue-300 dark:border-blue-600 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                  theme === 'dark' 
+                    ? 'bg-gray-800 text-white' 
+                    : 'bg-white text-gray-900'
+                }`}
               >
-                <option value="">Select Universe...</option>
+                <option value="">Select Trading Universe...</option>
                 {universes.map((universe) => (
                   <option key={universe.id} value={universe.id}>
                     {universe.name} ({universe.typical_count} symbols)
                   </option>
                 ))}
               </select>
-              <div className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
-                {selectedUniverse && universes.find(u => u.id === selectedUniverse)?.description}
+              {/* Custom dropdown arrow */}
+              <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                <svg className={`w-4 h-4 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
               </div>
             </div>
-          ) : (
+            
+            {/* Universe Description */}
+            {selectedUniverse && (
+              <div className={`text-xs p-2 rounded ${theme === 'dark' ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600'}`}>
+                <strong>Selected:</strong> {universes.find(u => u.id === selectedUniverse)?.description}
+              </div>
+            )}
+            
+            {/* Current Symbols Display */}
             <div className="flex flex-wrap gap-1">
               {config.universe?.primary_symbols?.map((symbol: string) => (
                 <span key={symbol} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
@@ -524,7 +653,7 @@ const StrategyParametersPanel: React.FC<{
                 </span>
               ))}
             </div>
-          )}
+          </div>
         </div>
 
         {/* Trading Parameters */}
@@ -714,7 +843,22 @@ const TestResultsPanel: React.FC<{ result: TestResult }> = ({ result }) => {
 // AI Assistant panel
 const AIAssistantPanel: React.FC<{ strategy: StrategyConfig }> = ({ strategy }) => {
   const { theme } = useTheme();
-  const [messages, setMessages] = useState<Array<{role: string, content: string, timestamp: string}>>([]);
+  const [messages, setMessages] = useState<Array<{role: string, content: string, timestamp: string}>>([
+    {
+      role: 'assistant',
+      content: `Hi! I'm your AI Strategy Assistant. I have full context of your "${strategy.name}" strategy including all parameters, risk settings, and configuration. 
+
+I can help you with:
+• Parameter optimization recommendations
+• Risk analysis and suggestions  
+• Strategy performance insights
+• Configuration troubleshooting
+• Market condition adjustments
+
+Ask me anything about your strategy setup or how to improve it!`,
+      timestamp: new Date().toISOString()
+    }
+  ]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -739,7 +883,20 @@ const AIAssistantPanel: React.FC<{ strategy: StrategyConfig }> = ({ strategy }) 
         },
         body: JSON.stringify({
           message: inputMessage,
-          include_context: true
+          include_context: true,
+          strategy_context: {
+            id: strategy.id,
+            name: strategy.name,
+            strategy_id: strategy.strategy_id,
+            config_data: strategy.config_data,
+            current_parameters: {
+              universe: strategy.config_data.universe,
+              trading: strategy.config_data.trading,
+              risk: strategy.config_data.risk,
+              entry_signals: strategy.config_data.entry_signals,
+              exit_rules: strategy.config_data.exit_rules
+            }
+          }
         })
       });
 
@@ -849,7 +1006,51 @@ const AIAssistantPanel: React.FC<{ strategy: StrategyConfig }> = ({ strategy }) 
 };
 
 // Empty state when no strategy is selected
-const EmptyStrategyView: React.FC<{ onCreateNew: () => void }> = ({ onCreateNew }) => {
+const EmptyStrategyView: React.FC<{ 
+  availableStrategies: SystemStrategy[];
+  onCreateNew: () => void;
+  showBackButton?: boolean;
+  onBack?: () => void;
+  isLoadingStrategies?: boolean;
+}> = ({ availableStrategies, onCreateNew, showBackButton = false, onBack, isLoadingStrategies = false }) => {
+  
+  const createSandboxStrategy = async (baseStrategy: SystemStrategy) => {
+    try {
+      // Create a new sandbox configuration based on the selected base strategy
+      const response = await fetch('/api/sandbox/strategies/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          strategy_id: baseStrategy.id,
+          name: `${baseStrategy.name} - Custom`,
+          config_data: {
+            // Load default parameters from the base strategy
+            universe: {
+              universe_name: "thetacrop", // Default universe
+            },
+            trading: {
+              target_dte_range: [baseStrategy.min_dte, baseStrategy.max_dte],
+              max_positions: 5
+            },
+            risk: {
+              profit_target: 0.5,
+              loss_limit: -2.0
+            }
+          }
+        })
+      });
+
+      if (response.ok) {
+        const newStrategy = await response.json();
+        // Notify parent that a new strategy was created
+        onCreateNew();
+      }
+    } catch (error) {
+      console.error('Error creating sandbox strategy:', error);
+    }
+  };
   const { theme } = useTheme();
   
   const themeClasses = {
@@ -860,22 +1061,119 @@ const EmptyStrategyView: React.FC<{ onCreateNew: () => void }> = ({ onCreateNew 
   };
 
   return (
-    <div className={`flex-1 flex items-center justify-center ${themeClasses.container}`}>
-      <div className="text-center max-w-md">
-        <Settings className={`w-16 h-16 mx-auto mb-4 ${themeClasses.icon}`} />
-        <h2 className={`text-xl font-semibold ${themeClasses.title} mb-2`}>Strategy Sandbox</h2>
-        <p className={`${themeClasses.text} mb-6`}>
-          Create and test your trading strategies in a safe environment. 
-          Run tests with historical data, get AI feedback, and deploy when ready.
-        </p>
-        <button
-          onClick={onCreateNew}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg mx-auto transition-colors"
-        >
-          <Plus className="w-5 h-5" />
-          Create Your First Strategy
-        </button>
+    <div className={`flex-1 flex flex-col ${themeClasses.container}`}>
+      {showBackButton && (
+        <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+          <button
+            onClick={onBack}
+            className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+          >
+            ← Back to Your Strategies
+          </button>
+        </div>
+      )}
+      <div className="flex-1 flex items-center justify-center">
+        <div className="text-center max-w-2xl">
+          <Settings className={`w-16 h-16 mx-auto mb-4 ${themeClasses.icon}`} />
+          <h2 className={`text-xl font-semibold ${themeClasses.title} mb-2`}>Strategy Sandbox</h2>
+          <p className={`${themeClasses.text} mb-6`}>
+            Create and test your trading strategies in a safe environment. 
+            Select a base strategy below to customize and test with your own parameters.
+          </p>
+          
+          {isLoadingStrategies ? (
+            <div className={`p-4 ${themeClasses.text} text-center`}>
+              <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+              Loading available strategies...
+            </div>
+          ) : availableStrategies.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-8">
+              {availableStrategies.map((strategy) => (
+                <div
+                  key={strategy.id}
+                  className={`p-4 border rounded-lg cursor-pointer transition-all hover:shadow-md ${
+                    theme === 'dark' 
+                      ? 'border-gray-600 hover:border-gray-500 bg-gray-800' 
+                      : 'border-gray-200 hover:border-gray-300 bg-white'
+                  }`}
+                  onClick={() => createSandboxStrategy(strategy)}
+                >
+                  <h3 className={`font-medium ${themeClasses.title} mb-1`}>{strategy.name}</h3>
+                  <p className={`text-sm ${themeClasses.text} mb-2`}>{strategy.description}</p>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className={`px-2 py-1 rounded ${
+                      theme === 'dark' ? 'bg-blue-900 text-blue-300' : 'bg-blue-100 text-blue-700'
+                    }`}>
+                      {strategy.category}
+                    </span>
+                    <span className={themeClasses.text}>
+                      {strategy.total_opportunities} opportunities
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className={`p-4 ${themeClasses.text} text-center`}>
+              <p>No strategies available. Please check your connection and try again.</p>
+              <button 
+                onClick={() => window.location.reload()} 
+                className="mt-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              >
+                Reload Page
+              </button>
+            </div>
+          )}
+        </div>
       </div>
+    </div>
+  );
+};
+
+// JSON-Driven Parameters Panel - Uses ui_metadata to generate forms automatically
+const JsonDrivenParametersPanel: React.FC<{ 
+  strategy: StrategyConfig,
+  baseStrategy?: SystemStrategy,
+  onParameterChange?: (parameter: string, value: any) => void 
+}> = ({ strategy, baseStrategy, onParameterChange }) => {
+  const [localConfig, setLocalConfig] = useState(strategy);
+
+  const handleConfigChange = (newConfig: any) => {
+    setLocalConfig(newConfig);
+    
+    // Extract changes and call onParameterChange for each
+    if (onParameterChange && baseStrategy?.complete_config?.ui_metadata) {
+      // For now, we'll call it with the full config
+      // In a real implementation, you'd diff the changes
+      Object.keys(baseStrategy.complete_config.ui_metadata || {}).forEach(path => {
+        const newValue = get(newConfig, path);
+        const oldValue = get(strategy, path);
+        if (JSON.stringify(newValue) !== JSON.stringify(oldValue)) {
+          onParameterChange(path, newValue);
+        }
+      });
+    }
+  };
+
+  // Only render if baseStrategy has ui_metadata
+  if (!baseStrategy?.complete_config?.ui_metadata) {
+    return (
+      <div className="p-4 text-center text-gray-500">
+        <p>This strategy doesn't support advanced configuration yet.</p>
+        <p className="text-sm">Add ui_metadata to the strategy JSON to enable custom parameters.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <JsonDrivenForm
+        config={localConfig.config_data}
+        uiMeta={baseStrategy.complete_config.ui_metadata}
+        onConfigChange={handleConfigChange}
+        title={`${baseStrategy.name} Configuration`}
+        description="Customize strategy parameters using the advanced configuration system"
+      />
     </div>
   );
 };

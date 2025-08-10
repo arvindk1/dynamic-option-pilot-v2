@@ -3,74 +3,80 @@
   "strategy_name": "Straddle",
   "strategy_type": "STRADDLE",
   "description": "Buy a call and a put at the same strike - profit from large moves in either direction",
-  
   "universe": {
-    "symbol_types": ["STOCK", "ETF"],
+    "symbol_types": [
+      "STOCK",
+      "ETF"
+    ],
     "min_market_cap": 10000000000,
     "min_avg_volume": 5000000,
     "min_option_volume": 2000,
     "high_volatility_candidates": true,
     "earnings_plays_preferred": true
   },
-  
   "position_parameters": {
     "max_premium_cost": 0.05,
     "max_opportunities": 3,
     "position_size_limit": 2000
   },
-  
   "entry_signals": {
-    "volatility_min": 0.40,
+    "volatility_min": 0.4,
     "bias": "ANY",
     "implied_volatility_rank_min": 50,
     "expected_move_threshold": 0.08
   },
-  
   "strike_selection": {
     "moneyness": "ATM",
     "max_strike_offset": 0.01,
     "prefer_highest_volume": true,
     "min_open_interest": 100
   },
-  
   "timing": {
-    "dte_range": [7, 60],
-    "optimal_dte": [14, 30],
+    "dte_range": [
+      7,
+      60
+    ],
+    "optimal_dte": [
+      14,
+      30
+    ],
     "earnings_timing": {
-      "days_before_earnings": [1, 7],
+      "days_before_earnings": [
+        1,
+        7
+      ],
       "avoid_post_earnings": true
     }
   },
-  
   "exit_rules": {
     "profit_targets": [
-      { 
-        "level": 1.00, 
-        "action": "CLOSE_ALL", 
+      {
+        "level": 1.0,
+        "action": "CLOSE_ALL",
         "priority": 90,
         "description": "Close when doubled investment"
       },
-      { 
-        "level": 0.50, 
-        "action": "CLOSE_HALF", 
+      {
+        "level": 0.5,
+        "action": "CLOSE_HALF",
         "priority": 80,
         "description": "Take partial profits at 50% gain"
       }
     ],
     "stop_loss_rules": [
-      { 
-        "type": "PERCENTAGE", 
-        "trigger": -0.50, 
-        "action": "CLOSE_ALL", 
+      {
+        "type": "PERCENTAGE",
+        "trigger": -0.5,
+        "action": "CLOSE_ALL",
         "priority": 100,
         "description": "Close at 50% loss"
       }
     ],
     "time_exits": [
-      { 
-        "condition": "dte_less_than", 
-        "value": 3, 
-        "action": "CLOSE_ALL", 
+      {
+        "condition": "dte_less_than",
+        "value": 3,
+        "action": "CLOSE_ALL",
         "priority": 85,
         "description": "Close 3 days before expiration"
       }
@@ -78,14 +84,13 @@
     "volatility_exits": [
       {
         "condition": "iv_crush",
-        "threshold": 0.30,
+        "threshold": 0.3,
         "action": "CLOSE_ALL",
         "priority": 95,
         "description": "Close immediately if IV drops 30%"
       }
     ]
   },
-  
   "scoring": {
     "volatility_weight": 0.6,
     "expected_move_weight": 0.4,
@@ -100,14 +105,12 @@
     "score_ceiling": 10.0,
     "round_decimals": 1
   },
-  
   "risk_management": {
     "max_allocation_percentage": 15,
     "max_single_straddle_cost": 2000,
     "volatility_risk_limit": 0.6,
     "time_decay_protection": true
   },
-  
   "educational_content": {
     "best_for": "Large directional moves in either direction",
     "when_to_use": "Before earnings, major events, or high volatility periods",
@@ -116,6 +119,363 @@
     "typical_duration": "7-30 days",
     "max_profit": "Unlimited in either direction",
     "max_loss": "Total premium paid for both options",
-    "breakevens": ["Strike - total premium", "Strike + total premium"]
+    "breakevens": [
+      "Strike - total premium",
+      "Strike + total premium"
+    ]
+  },
+  "ui_metadata": {
+    "sections": [
+      {
+        "id": "position_parameters",
+        "title": "Position Parameters",
+        "description": "Core position sizing and timing parameters",
+        "fields": [
+          {
+            "key": "position_parameters.max_premium_cost",
+            "label": "Max Premium Cost",
+            "description": "Maximum premium cost",
+            "type": "slider",
+            "default": 0.05,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          },
+          {
+            "key": "position_parameters.max_opportunities",
+            "label": "Max Opportunities",
+            "description": "Maximum number of opportunities to find",
+            "type": "number",
+            "default": 3,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          },
+          {
+            "key": "position_parameters.position_size_limit",
+            "label": "Position Size Limit",
+            "description": "Position Size Limit parameter",
+            "type": "number",
+            "default": 2000,
+            "min": 1000,
+            "max": 6000,
+            "step": 1
+          }
+        ]
+      },
+      {
+        "id": "entry_signals",
+        "title": "Entry Signals",
+        "description": "Conditions for entering new positions",
+        "fields": [
+          {
+            "key": "entry_signals.volatility_min",
+            "label": "Volatility Min",
+            "description": "Minimum volatility min",
+            "type": "slider",
+            "default": 0.4,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          },
+          {
+            "key": "entry_signals.bias",
+            "label": "Bias",
+            "description": "Bias parameter",
+            "type": "select",
+            "options": [
+              "ANY"
+            ],
+            "default": "ANY"
+          },
+          {
+            "key": "entry_signals.implied_volatility_rank_min",
+            "label": "Implied Volatility Rank Min",
+            "description": "Minimum implied volatility rank min",
+            "type": "number",
+            "default": 50,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          },
+          {
+            "key": "entry_signals.expected_move_threshold",
+            "label": "Expected Move Threshold",
+            "description": "Threshold for expected move",
+            "type": "slider",
+            "default": 0.08,
+            "min": 0.008,
+            "max": 0.4,
+            "step": 0.01
+          }
+        ]
+      },
+      {
+        "id": "exit_rules",
+        "title": "Exit Rules",
+        "description": "Profit targets, stop losses, and exit conditions",
+        "fields": [
+          {
+            "key": "exit_rules.profit_targets",
+            "label": "Profit Targets",
+            "description": "Target profits",
+            "type": "text",
+            "default": "[{'level': 1.0, 'action': 'CLOSE_ALL', 'priority': 90, 'description': 'Close when doubled investment'}, {'level': 0.5, 'action': 'CLOSE_HALF', 'priority': 80, 'description': 'Take partial profits at 50% gain'}]"
+          },
+          {
+            "key": "exit_rules.stop_loss_rules",
+            "label": "Stop Loss Rules",
+            "description": "Stop Loss Rules parameter",
+            "type": "text",
+            "default": "[{'type': 'PERCENTAGE', 'trigger': -0.5, 'action': 'CLOSE_ALL', 'priority': 100, 'description': 'Close at 50% loss'}]"
+          },
+          {
+            "key": "exit_rules.time_exits",
+            "label": "Time Exits",
+            "description": "Time Exits parameter",
+            "type": "text",
+            "default": "[{'condition': 'dte_less_than', 'value': 3, 'action': 'CLOSE_ALL', 'priority': 85, 'description': 'Close 3 days before expiration'}]"
+          },
+          {
+            "key": "exit_rules.volatility_exits",
+            "label": "Volatility Exits",
+            "description": "Volatility Exits parameter",
+            "type": "text",
+            "default": "[{'condition': 'iv_crush', 'threshold': 0.3, 'action': 'CLOSE_ALL', 'priority': 95, 'description': 'Close immediately if IV drops 30%'}]"
+          }
+        ]
+      },
+      {
+        "id": "risk_management",
+        "title": "Risk Management",
+        "description": "Portfolio-level risk controls and limits",
+        "fields": [
+          {
+            "key": "risk_management.max_allocation_percentage",
+            "label": "Max Allocation Percentage",
+            "description": "Maximum allocation percentage",
+            "type": "number",
+            "default": 15,
+            "min": 1,
+            "max": 100,
+            "step": 1,
+            "format": "percentage"
+          },
+          {
+            "key": "risk_management.max_single_straddle_cost",
+            "label": "Max Single Straddle Cost",
+            "description": "Maximum single straddle cost",
+            "type": "number",
+            "default": 2000,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          },
+          {
+            "key": "risk_management.volatility_risk_limit",
+            "label": "Volatility Risk Limit",
+            "description": "Volatility Risk Limit parameter",
+            "type": "slider",
+            "default": 0.6,
+            "min": 0.1,
+            "max": 2.0,
+            "step": 0.05
+          },
+          {
+            "key": "risk_management.time_decay_protection",
+            "label": "Time Decay Protection",
+            "description": "Time Decay Protection parameter",
+            "type": "toggle",
+            "default": true
+          }
+        ]
+      },
+      {
+        "id": "strike_selection",
+        "title": "Strike Selection",
+        "description": "How to select optimal strike prices",
+        "fields": [
+          {
+            "key": "strike_selection.moneyness",
+            "label": "Moneyness",
+            "description": "Moneyness parameter",
+            "type": "select",
+            "options": [
+              "ATM"
+            ],
+            "default": "ATM"
+          },
+          {
+            "key": "strike_selection.max_strike_offset",
+            "label": "Max Strike Offset",
+            "description": "Maximum strike offset",
+            "type": "slider",
+            "default": 0.01,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          },
+          {
+            "key": "strike_selection.prefer_highest_volume",
+            "label": "Prefer Highest Volume",
+            "description": "Prefer Highest Volume parameter",
+            "type": "toggle",
+            "default": true
+          },
+          {
+            "key": "strike_selection.min_open_interest",
+            "label": "Min Open Interest",
+            "description": "Minimum open interest",
+            "type": "number",
+            "default": 100,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          }
+        ]
+      },
+      {
+        "id": "scoring",
+        "title": "Scoring Parameters",
+        "description": "Opportunity scoring weights and criteria",
+        "fields": [
+          {
+            "key": "scoring.volatility_weight",
+            "label": "Volatility Weight",
+            "description": "Volatility Weight parameter",
+            "type": "slider",
+            "default": 0.6,
+            "min": 0.1,
+            "max": 2.0,
+            "step": 0.05
+          },
+          {
+            "key": "scoring.expected_move_weight",
+            "label": "Expected Move Weight",
+            "description": "Expected Move Weight parameter",
+            "type": "slider",
+            "default": 0.4,
+            "min": 0.04000000000000001,
+            "max": 2.0,
+            "step": 0.01
+          },
+          {
+            "key": "scoring.earnings_proximity_bonus",
+            "label": "Earnings Proximity Bonus",
+            "description": "Earnings Proximity Bonus parameter",
+            "type": "slider",
+            "default": 1.5,
+            "min": 0.15000000000000002,
+            "max": 7.5,
+            "step": 0.01
+          },
+          {
+            "key": "scoring.liquidity_weight",
+            "label": "Liquidity Weight",
+            "description": "Liquidity Weight parameter",
+            "type": "slider",
+            "default": 0.3,
+            "min": 0.03,
+            "max": 1.5,
+            "step": 0.01
+          },
+          {
+            "key": "scoring.score_floor",
+            "label": "Score Floor",
+            "description": "Score Floor parameter",
+            "type": "slider",
+            "default": 1.0,
+            "min": 0.1,
+            "max": 5.0,
+            "step": 0.01
+          },
+          {
+            "key": "scoring.score_ceiling",
+            "label": "Score Ceiling",
+            "description": "Score Ceiling parameter",
+            "type": "slider",
+            "default": 10.0,
+            "min": 1.0,
+            "max": 50.0,
+            "step": 0.01
+          },
+          {
+            "key": "scoring.round_decimals",
+            "label": "Round Decimals",
+            "description": "Round Decimals parameter",
+            "type": "number",
+            "default": 1,
+            "min": 1,
+            "max": 3,
+            "step": 1
+          }
+        ]
+      },
+      {
+        "id": "universe",
+        "title": "Trading Universe",
+        "description": "Symbol selection and filtering criteria",
+        "fields": [
+          {
+            "key": "universe.symbol_types",
+            "label": "Symbol Types",
+            "description": "Symbol Types parameter",
+            "type": "multiselect",
+            "options": [
+              "STOCK",
+              "ETF"
+            ],
+            "default": [
+              "STOCK",
+              "ETF"
+            ]
+          },
+          {
+            "key": "universe.min_market_cap",
+            "label": "Min Market Cap",
+            "description": "Minimum market cap",
+            "type": "number",
+            "default": 10000000000,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          },
+          {
+            "key": "universe.min_avg_volume",
+            "label": "Min Avg Volume",
+            "description": "Minimum avg volume",
+            "type": "number",
+            "default": 5000000,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          },
+          {
+            "key": "universe.min_option_volume",
+            "label": "Min Option Volume",
+            "description": "Minimum option volume",
+            "type": "number",
+            "default": 2000,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          },
+          {
+            "key": "universe.high_volatility_candidates",
+            "label": "High Volatility Candidates",
+            "description": "High Volatility Candidates parameter",
+            "type": "toggle",
+            "default": true
+          },
+          {
+            "key": "universe.earnings_plays_preferred",
+            "label": "Earnings Plays Preferred",
+            "description": "Earnings Plays Preferred parameter",
+            "type": "toggle",
+            "default": true
+          }
+        ]
+      }
+    ]
   }
 }
