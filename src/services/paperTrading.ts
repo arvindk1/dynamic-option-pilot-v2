@@ -144,7 +144,7 @@ const normalizePosition = (p: PositionData): Trade => {
 };
 
 // ✅ Tiny fetch helper with timeout + robust error info
-const withTimeout = <T>(p: Promise<T>, ms = 15000): Promise<T> => {
+const withTimeout = <T>(p: Promise<T>, ms = 3000): Promise<T> => {
   let t: any;
   const timeout = new Promise<never>((_, rej) => (t = setTimeout(() => rej(new Error(`Timeout ${ms}ms`)), ms)));
   return Promise.race([p, timeout]).finally(() => clearTimeout(t));
@@ -152,7 +152,7 @@ const withTimeout = <T>(p: Promise<T>, ms = 15000): Promise<T> => {
 
 async function fetchJSON<T>(input: RequestInfo, init?: RequestInit & { timeoutMs?: number }): Promise<T> {
   const controller = new AbortController();
-  const timeoutMs = init?.timeoutMs ?? 15000;
+  const timeoutMs = init?.timeoutMs ?? 3000;
   const merged: RequestInit = { ...init, signal: controller.signal };
 
   try {
@@ -238,7 +238,7 @@ export class RealTradingService {
   // ---- LOAD ----
   async loadTrades(): Promise<void> {
     try {
-      const data = await fetchJSON<PositionData[]>(`${this.baseUrl}/positions/?sync=false`, { timeoutMs: 15000 });
+      const data = await fetchJSON<PositionData[]>(`${this.baseUrl}/positions/?sync=false`, { timeoutMs: 3000 });
       this.trades = Array.isArray(data) ? data.map(normalizePosition) : [];
       this.notifyListeners();
     } catch (err) {
@@ -283,12 +283,12 @@ export class RealTradingService {
   // ---- METRICS ----
   async getAccountMetrics(): Promise<AccountMetrics> {
     try {
-      const metrics = await fetchJSON<AccountMetrics>(`${this.baseUrl}/dashboard/metrics`, { timeoutMs: 15000 });
+      const metrics = await fetchJSON<AccountMetrics>(`${this.baseUrl}/dashboard/metrics`, { timeoutMs: 3000 });
 
       try {
         const perf = await fetchJSON<{ data: Array<{ t: string | number; v: number }> }>(
           `${this.baseUrl}/dashboard/performance?days=30`,
-          { timeoutMs: 15000 }
+          { timeoutMs: 3000 }
         );
         (metrics as AccountMetrics).performanceHistory = Array.isArray(perf?.data) ? perf.data : [];
       } catch (perfError) {

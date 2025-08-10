@@ -2,15 +2,24 @@
 
 ## 📖 ESSENTIAL CONTEXT - READ FIRST
 
-**IMPORTANT**: Before starting any work, always read the comprehensive project overview:
-- **Primary Reference**: `README.md` - Complete v2.0 architecture, migration plan, and development guidelines
-- **Project Location**: `/home/arvindk/devl/dynamic-option-pilot-v2/README.md`
-- **Key Sections**: Architecture overview, V1→V2 migration strategy, strategy system, external configuration
-- **Troubleshooting Guide**: `TROUBLESHOOTING_GUIDE.md` - Latest fixes and debugging procedures for V2 architecture
+**🚨 CRITICAL: READ THESE FILES IN ORDER EVERY SESSION:**
 
-The README contains the definitive project plan, architecture decisions, and development standards that must be followed.
+1. **`ACTION_PLAN.md`** - **MASTER ACTION PLAN** with current progress, priorities, and session handoff checklist
+2. **`README.md`** - Complete v2.0 architecture, migration plan, and development guidelines  
+3. **`TROUBLESHOOTING_GUIDE.md`** - Latest fixes and debugging procedures for V2 architecture
+4. **This CLAUDE.md** - Session context and architectural principles
 
-### 🚀 SESSION START CHECKLIST (Updated 2025-08-04)
+**The ACTION_PLAN.md is the single source of truth for all development work and must be updated each session.**
+
+### 🚀 SESSION START CHECKLIST (Updated 2025-08-10)
+
+**🎯 MANDATORY FIRST STEP**: Read `/home/arvindk/devl/dynamic-option-pilot-v2/ACTION_PLAN.md` completely to understand:
+- Current project status and progress percentages
+- Immediate next actions and priorities  
+- Recent completions and ongoing work
+- Session handoff checklist
+
+**Then proceed with system checks**:
 1. **Read README.md** - Current architecture and migration status
 2. **Check TROUBLESHOOTING_GUIDE.md** - Latest fixes and debugging procedures
 3. **✅ COMPLETED**: V1→V2 strategy migration (13 strategies loaded)
@@ -714,8 +723,11 @@ curl http://localhost:8000/api/sandbox/strategies/ | python3 -c "import json,sys
 
 ## 📚 REFERENCE DOCUMENTATION
 
+**🚨 PRIMARY REFERENCE**: `ACTION_PLAN.md` - Master action plan with all current priorities and progress
+
 For detailed information, consult these specialized guides:
 
+- **`ACTION_PLAN.md`** - **MASTER ACTION PLAN** (read first every session)
 - **`README.md`** - Complete project architecture and development guidelines
 - **`TROUBLESHOOTING_GUIDE.md`** - Debugging procedures, error analysis, database commands
 - **`STRATEGY_SANDBOX_IMPLEMENTATION_SUMMARY.md`** - Complete sandbox implementation details

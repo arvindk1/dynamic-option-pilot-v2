@@ -222,6 +222,41 @@ class EarningsIntelligenceService:
             "days_until": 1
         }
     
+    def get_earnings_proximity(self, symbol: str) -> Optional[int]:
+        """Get days until next earnings for a symbol. Returns None if no earnings within 7 days."""
+        try:
+            earnings_info = self._get_next_earnings_date(symbol)
+            if earnings_info and earnings_info.get('days_until') is not None:
+                days_until = earnings_info['days_until']
+                return days_until if days_until <= 7 else None
+            return None
+        except Exception as e:
+            logger.warning(f"Could not get earnings proximity for {symbol}: {e}")
+            return None
+    
+    def check_earnings_before_expiry(self, symbol: str, days_to_expiry: int) -> Optional[dict]:
+        """Check if earnings occur before option expiry. Returns earnings info if relevant."""
+        try:
+            earnings_info = self._get_next_earnings_date(symbol)
+            if earnings_info and earnings_info.get('days_until') is not None:
+                days_until_earnings = earnings_info['days_until']
+                
+                # Only return earnings info if:
+                # 1. Earnings are within 7 days (immediate concern)
+                # 2. Earnings occur before expiry (affects the trade)
+                if days_until_earnings <= 7 and days_until_earnings < days_to_expiry:
+                    return {
+                        "earnings_days": days_until_earnings,
+                        "earnings_date": earnings_info.get('date'),
+                        "earnings_time": earnings_info.get('time', 'AMC'),
+                        "confirmed": earnings_info.get('confirmed', True),
+                        "affects_trade": True
+                    }
+            return None
+        except Exception as e:
+            logger.warning(f"Could not check earnings timing for {symbol}: {e}")
+            return None
+    
     def get_sector_earnings_summary(self) -> Dict[str, Any]:
         """Get earnings summary by sector."""
         

@@ -1,0 +1,93 @@
+# this worked with twitter (arvindk) account
+
+#!/usr/bin/env python3
+import os
+import sys
+import logging
+from dotenv import load_dotenv
+import tweepy
+from tweepy.errors import TweepyException
+
+# — Logging setup ———————————————————————————————————————————————————————————————————————
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S"
+)
+logger = logging.getLogger(__name__)
+
+# — Load environment ——————————————————————————————————————————————————————————————————
+load_dotenv()
+
+# Required for v2 create_tweet:
+REQUIRED = {
+    "TWITTER_API_KEY",
+    "TWITTER_API_SECRET",
+    "TWITTER_ACCESS_TOKEN",
+    "TWITTER_ACCESS_TOKEN_SECRET",
+}
+
+def check_env():
+    missing = [k for k in REQUIRED if not os.getenv(k)]
+    if missing:
+        logger.error("Missing env vars: %s", ", ".join(missing))
+        return False
+    return True
+
+def check_oauth1():
+    """Sanity check: can still verify v1.1 creds, but won't post via v1.1."""
+    logger.info("Verifying OAuth1 credentials…")
+    try:
+        auth = tweepy.OAuth1UserHandler(
+            os.getenv("TWITTER_API_KEY"),
+            os.getenv("TWITTER_API_SECRET"),
+            os.getenv("TWITTER_ACCESS_TOKEN"),
+            os.getenv("TWITTER_ACCESS_TOKEN_SECRET"),
+        )
+        api = tweepy.API(auth, wait_on_rate_limit=True)
+        user = api.verify_credentials()
+        if user:
+            logger.info("OAuth1 OK: @%s", user.screen_name)
+            return True
+    except TweepyException:
+        logger.exception("OAuth1 verification failed")
+    return False
+
+def post_tweet_v2(text: str):
+    """Post via the v2 create_tweet endpoint."""
+    logger.info("Posting via v2 create_tweet: %r", text)
+    try:
+        client = tweepy.Client(
+            consumer_key=os.getenv("TWITTER_API_KEY"),
+            consumer_secret=os.getenv("TWITTER_API_SECRET"),
+            access_token=os.getenv("TWITTER_ACCESS_TOKEN"),
+            access_token_secret=os.getenv("TWITTER_ACCESS_TOKEN_SECRET"),
+            wait_on_rate_limit=True
+        )
+        resp = client.create_tweet(text=text)
+        tweet_id = resp.data.get("id")
+        logger.info("Tweet posted! id=%s", tweet_id)
+    except TweepyException as e:
+        # 403 here means you still lack tweet.write scope
+        logger.error("Failed to post via v2.create_tweet: %s", e)
+        sys.exit(1)
+
+def main():
+    if not check_env():
+        sys.exit(1)
+
+    if not check_oauth1():
+        logger.error("OAuth1 verification failed—check your keys/secrets.")
+        sys.exit(1)
+
+    # ─── Your announcement ─────────────────────────────────────────────────────────────────
+    message = (
+        "🚀 Anthropic has officially launched **Claude Opus 4.1**, achieving 74.5% on SWE-bench "
+        "and unlocking advanced agentic reasoning for real-world workflows! #AI #Anthropic"
+    )
+    # ────────────────────────────────────────────────────────────────────────────────────────
+
+    post_tweet_v2(message)
+
+if __name__ == "__main__":
+    main()

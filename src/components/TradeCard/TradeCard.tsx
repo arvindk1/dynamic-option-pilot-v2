@@ -80,6 +80,7 @@ interface TradeOpportunity {
   data_source_provider?: string;
   pricing_confidence?: number;
   data_quality_score?: number;
+  earnings_days?: number; // Days until next earnings (if within 7 days)
   
   // Enhanced Scoring System Fields
   overall_score?: number;
@@ -111,6 +112,11 @@ interface TradeCardProps {
 }
 
 import { StrategyDisplay } from './StrategyDisplay';
+import TradeCardHeader from './TradeCardHeader';
+import FactorChips from './FactorChips';
+import RiskRow from './RiskRow';
+import TradeCardActions from './TradeCardActions';
+import { NewTradeCard } from './NewTradeCard';
 
 // Get entry/exit price levels for automated trading
 const getTradingLevels = (trade: TradeOpportunity) => {
@@ -575,6 +581,13 @@ export const TradeCard: React.FC<TradeCardProps> = React.memo(({
             <Badge className={strategyColor} variant="secondary">
               {trade.strategy_type.replace('_', ' ')}
             </Badge>
+            {/* Earnings proximity badge */}
+            {trade.earnings_days !== undefined && trade.earnings_days <= 7 && (
+              <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-300 mt-1">
+                <AlertTriangle className="w-3 h-3 mr-1" />
+                ⚠ Earnings in {trade.earnings_days} day{trade.earnings_days !== 1 ? 's' : ''}
+              </Badge>
+            )}
           </div>
         </div>
         
@@ -781,6 +794,13 @@ export const CompactTradeCard: React.FC<TradeCardProps> = React.memo(({
             <Badge variant="secondary" className="text-xs">
               {trade.strategy_type.replace('_', ' ')}
             </Badge>
+            {/* Earnings proximity badge */}
+            {trade.earnings_days !== undefined && trade.earnings_days <= 7 && (
+              <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-300">
+                <AlertTriangle className="w-3 h-3 mr-1" />
+                Earnings in {trade.earnings_days} day{trade.earnings_days !== 1 ? 's' : ''}
+              </Badge>
+            )}
           </div>
           <div className="text-right">
             {(trade.overall_score || trade.quality_tier) && (
@@ -897,7 +917,7 @@ export const ResponsiveTradeCard: React.FC<TradeCardProps> = React.memo(({
   return isMobile ? (
     <CompactTradeCard trade={trade} onExecute={onExecute} isExecuting={isExecuting} />
   ) : (
-    <TradeCard trade={trade} onExecute={onExecute} isExecuting={isExecuting} />
+    <NewTradeCard trade={trade} onExecute={onExecute} isExecuting={isExecuting} />
   );
 });
 

@@ -6,6 +6,8 @@ import os
 from contextlib import asynccontextmanager
 from typing import Dict, Any, Optional
 from datetime import datetime, timedelta
+import uuid
+import threading
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -62,6 +64,10 @@ engine_registry = None
 opportunity_cache = None
 options_scheduler = None
 strategy_registry = None
+
+# Simple in-memory job tracking for scan progress
+scan_jobs: Dict[str, Dict[str, Any]] = {}
+scan_jobs_lock = threading.Lock()
 
 
 @asynccontextmanager
@@ -254,12 +260,15 @@ async def lifespan(app: FastAPI):
             await plugin_registry.cleanup_all()
 
 
-# Create FastAPI app
+# Create FastAPI app with ORJson performance boost
+from fastapi.responses import ORJSONResponse
+
 app = FastAPI(
     title="Dynamic Option Pilot v2.0",
     description="Advanced Options Trading Platform with Plugin Architecture",
     version="2.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
+    default_response_class=ORJSONResponse  # 2-3x faster JSON responses
 )
 
 # Add CORS middleware
@@ -301,6 +310,115 @@ async def health_check():
     except Exception as e:
         logger.error(f"Health check failed: {e}")
         return {"status": "unhealthy", "error": str(e)}
+
+
+@app.get("/health/ready")
+async def health_ready():
+    """Enhanced health check for production readiness."""
+    services_status = {}
+    all_ready = True
+    
+    try:
+        # Check core components
+        services_status["plugin_registry"] = plugin_registry is not None
+        services_status["event_bus"] = event_bus is not None
+        services_status["opportunity_cache"] = opportunity_cache is not None
+        services_status["strategy_registry"] = strategy_registry is not None
+        
+        # Test database connectivity
+        try:
+            from models.database import get_db
+            db_gen = get_db()
+            db = next(db_gen)
+            db.execute("SELECT 1").fetchone()  # Quick connectivity test
+            services_status["database"] = True
+        except Exception as e:
+            services_status["database"] = False
+            all_ready = False
+            logger.warning(f"Database check failed: {e}")
+        
+        # Test cache service
+        try:
+            if opportunity_cache:
+                cache_stats = opportunity_cache.get_cache_stats()
+                services_status["cache"] = True
+            else:
+                services_status["cache"] = False
+                all_ready = False
+        except Exception as e:
+            services_status["cache"] = False
+            all_ready = False
+            logger.warning(f"Cache check failed: {e}")
+        
+        # Quick market data test
+        try:
+            if plugin_registry:
+                yf_provider = plugin_registry.get_plugin("yfinance_provider")
+                if yf_provider:
+                    test_data = await yf_provider.get_market_data("SPY")
+                    services_status["market_data"] = test_data is not None and test_data.get('price')
+                else:
+                    services_status["market_data"] = False
+                    all_ready = False
+            else:
+                services_status["market_data"] = False
+                all_ready = False
+        except Exception as e:
+            services_status["market_data"] = False
+            all_ready = False
+            logger.warning(f"Market data check failed: {e}")
+        
+        return {
+            "status": "ready" if all_ready else "not_ready",
+            "timestamp": datetime.utcnow().isoformat(),
+            "services": services_status,
+            "ready": all_ready
+        }
+        
+    except Exception as e:
+        logger.error(f"Readiness check failed: {e}")
+        return {
+            "status": "error",
+            "timestamp": datetime.utcnow().isoformat(),
+            "services": services_status,
+            "ready": False,
+            "error": str(e)
+        }
+
+
+@app.get("/api/debug/errors/recent")
+async def get_recent_errors(limit: int = 20, error_type: Optional[str] = None, service: Optional[str] = None):
+    """Quick error list endpoint for debugging - dev focused."""
+    try:
+        from services.error_logging_service import get_critical_errors
+        
+        errors = await get_critical_errors(
+            limit=limit,
+            error_type=error_type,
+            service=service,
+            since_hours=24  # Last 24 hours only
+        )
+        
+        return {
+            "total_count": len(errors),
+            "errors": errors,
+            "filters_applied": {
+                "limit": limit,
+                "error_type": error_type,
+                "service": service,
+                "since_hours": 24
+            },
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to fetch recent errors: {e}")
+        return {
+            "total_count": 0,
+            "errors": [],
+            "error": f"Failed to fetch errors: {str(e)}",
+            "timestamp": datetime.utcnow().isoformat()
+        }
 
 
 # System status endpoint
@@ -534,6 +652,7 @@ async def event_stream():
 
 # Import routers
 from api.routes import dashboard, ai_coach, risk_metrics
+# from api.routes import social_twitter
 from api import sandbox
 
 # Include routers
@@ -541,6 +660,7 @@ app.include_router(dashboard.router, prefix="/api/dashboard", tags=["dashboard"]
 app.include_router(ai_coach.router, prefix="/api/ai-coach", tags=["ai-coach"])
 app.include_router(risk_metrics.router, prefix="/api/risk", tags=["risk-metrics"])
 app.include_router(sandbox.router, tags=["sandbox"])
+# app.include_router(social_twitter.router)
 
 
 @app.get("/api/demo/account/metrics")  
@@ -1476,7 +1596,8 @@ async def get_strategies():
 async def get_strategy_opportunities(strategy_id: str, symbol: str = "SPY", max_opportunities: int = 10):
     """Get opportunities for a specific strategy."""
     # Get the opportunity cache
-    cache = get_opportunity_cache(plugin_registry)
+    # cache = get_opportunity_cache(plugin_registry)
+    cache = get_opportunity_cache()
     
     # Get all opportunities
     all_opportunities = await cache.get_opportunities()
@@ -1711,8 +1832,42 @@ async def scan_individual_strategy(strategy_id: str, symbol: Optional[str] = "SP
 
 
 @app.post("/api/strategies/{strategy_id}/quick-scan")
-async def quick_scan_strategy(strategy_id: str):
-    """Quick scan for a strategy using its default universe (like V1's quick scans)."""
+async def quick_scan_strategy(strategy_id: str, async_job: bool = False):
+    """Quick scan for a strategy using its default universe (like V1's quick scans).
+    
+    Args:
+        strategy_id: The strategy to scan
+        async_job: If True, returns job_id immediately and runs scan in background
+    """
+    
+    if async_job:
+        # Return job_id immediately, run scan in background
+        job_id = str(uuid.uuid4())
+        with scan_jobs_lock:
+            scan_jobs[job_id] = {
+                "strategy_id": strategy_id,
+                "status": "running",
+                "progress": 0,
+                "current_symbol": None,
+                "total_symbols": 0,
+                "opportunities_found": 0,
+                "started_at": datetime.utcnow().isoformat(),
+                "completed_at": None,
+                "error": None
+            }
+        
+        # Start background task
+        import asyncio
+        asyncio.create_task(_run_scan_job(job_id, strategy_id))
+        
+        return {
+            "job_id": job_id,
+            "status": "started",
+            "message": f"Scan job started for {strategy_id}",
+            "poll_url": f"/api/scan/{job_id}/status"
+        }
+    
+    # Original synchronous behavior
     try:
         registry = get_strategy_registry()
         if not registry:
@@ -1782,6 +1937,113 @@ async def quick_scan_strategy(strategy_id: str):
     except Exception as e:
         logger.error(f"Error in quick scan for {strategy_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Quick scan failed: {str(e)}")
+
+
+async def _run_scan_job(job_id: str, strategy_id: str):
+    """Background task to run scan job with progress tracking."""
+    try:
+        with scan_jobs_lock:
+            if job_id not in scan_jobs:
+                return  # Job was cancelled
+        
+        registry = get_strategy_registry()
+        if not registry:
+            with scan_jobs_lock:
+                scan_jobs[job_id]["status"] = "error"
+                scan_jobs[job_id]["error"] = "Strategy registry not available"
+            return
+            
+        strategy_plugin = registry.get_strategy(strategy_id)
+        if not strategy_plugin:
+            with scan_jobs_lock:
+                scan_jobs[job_id]["status"] = "error"
+                scan_jobs[job_id]["error"] = f"Strategy {strategy_id} not found"
+            return
+        
+        json_config = strategy_plugin.json_config
+        universe_config = json_config.universe or {}
+        
+        # Load symbols (same logic as synchronous version)
+        scan_symbols = []
+        universe_loader = get_universe_loader()
+        
+        if "universe_file" in universe_config:
+            try:
+                scan_symbols = universe_loader.load_universe_symbols(universe_config["universe_file"])
+                max_symbols = min(universe_config.get("max_symbols", 3), 3)
+                scan_symbols = scan_symbols[:max_symbols]
+            except Exception:
+                scan_symbols = universe_config.get("primary_symbols", [])[:3]
+        elif "primary_symbols" in universe_config:
+            scan_symbols = universe_config["primary_symbols"][:3]
+        elif "preferred_symbols" in universe_config:
+            scan_symbols = universe_config["preferred_symbols"][:3]
+        else:
+            try:
+                scan_symbols = universe_loader.load_universe_symbols("default_etfs.txt")[:3]
+            except Exception:
+                scan_symbols = ["SPY", "QQQ", "IWM"]
+        
+        # Update job with symbol count
+        with scan_jobs_lock:
+            scan_jobs[job_id]["total_symbols"] = len(scan_symbols)
+        
+        # Scan opportunities with progress tracking
+        opportunities = []
+        for i, symbol in enumerate(scan_symbols):
+            with scan_jobs_lock:
+                if scan_jobs[job_id]["status"] == "cancelled":
+                    return
+                scan_jobs[job_id]["current_symbol"] = symbol
+                scan_jobs[job_id]["progress"] = int((i / len(scan_symbols)) * 100)
+            
+            try:
+                # Simulate individual symbol scanning (in real implementation, modify scan_opportunities to accept single symbols)
+                symbol_opportunities = await asyncio.wait_for(
+                    strategy_plugin.scan_opportunities([symbol]), 
+                    timeout=10.0
+                )
+                opportunities.extend(symbol_opportunities)
+            except Exception as e:
+                logger.warning(f"Failed to scan {symbol} for {strategy_id}: {e}")
+        
+        # Job completed
+        with scan_jobs_lock:
+            scan_jobs[job_id]["status"] = "completed"
+            scan_jobs[job_id]["progress"] = 100
+            scan_jobs[job_id]["current_symbol"] = None
+            scan_jobs[job_id]["opportunities_found"] = len(opportunities)
+            scan_jobs[job_id]["completed_at"] = datetime.utcnow().isoformat()
+        
+        logger.info(f"Background scan job {job_id} completed: {len(opportunities)} opportunities found")
+        
+    except Exception as e:
+        logger.error(f"Background scan job {job_id} failed: {e}")
+        with scan_jobs_lock:
+            scan_jobs[job_id]["status"] = "error" 
+            scan_jobs[job_id]["error"] = str(e)
+            scan_jobs[job_id]["completed_at"] = datetime.utcnow().isoformat()
+
+
+@app.get("/api/scan/{job_id}/status")
+async def get_scan_job_status(job_id: str):
+    """Get status of a background scan job."""
+    with scan_jobs_lock:
+        if job_id not in scan_jobs:
+            raise HTTPException(status_code=404, detail="Job not found")
+        return scan_jobs[job_id].copy()
+
+
+@app.delete("/api/scan/{job_id}")
+async def cancel_scan_job(job_id: str):
+    """Cancel a running scan job."""
+    with scan_jobs_lock:
+        if job_id not in scan_jobs:
+            raise HTTPException(status_code=404, detail="Job not found")
+        if scan_jobs[job_id]["status"] == "running":
+            scan_jobs[job_id]["status"] = "cancelled"
+            scan_jobs[job_id]["completed_at"] = datetime.utcnow().isoformat()
+        return {"status": "cancelled", "job_id": job_id}
 
 
 @app.get("/api/market-commentary/daily-commentary")
@@ -1990,6 +2252,7 @@ async def get_sentiment_history(days: int = 7):
 @app.get("/api/sentiment/symbols/{symbol}")
 async def get_symbol_sentiment(symbol: str, hours: int = 24):
     """Get sentiment for a specific stock symbol."""
+    current_timestamp = datetime.utcnow().isoformat() + "Z"
     return {
         "symbol": symbol,
         "sentiment": {

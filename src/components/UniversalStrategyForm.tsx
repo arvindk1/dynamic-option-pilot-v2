@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from './ui/card';
 import { Button } from './ui/button';
 import { Slider } from './ui/slider';
@@ -6,7 +6,7 @@ import { Switch } from './ui/switch';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Badge } from './ui/badge';
-import { Info, Settings, TrendingUp, Shield, Target, Zap } from 'lucide-react';
+import { Info, Settings, TrendingUp, Shield, Target, Zap, Save, Download, Bookmark } from 'lucide-react';
 
 interface UniversalFormField {
   key: string;
@@ -370,17 +370,89 @@ const formatValue = (value: any, format?: string): string => {
   }
 };
 
-const UniversalStrategyForm: React.FC<UniversalStrategyFormProps> = ({ 
+// Preset management functions
+const PRESET_STORAGE_KEY = 'strategy_parameter_presets';
+
+const savePresetToStorage = (presetName: string, config: any) => {
+  const existingPresets = JSON.parse(localStorage.getItem(PRESET_STORAGE_KEY) || '{}');
+  existingPresets[presetName] = {
+    config_data: config,
+    strategy_type: config.strategy_type || 'unknown',
+    saved_at: new Date().toISOString()
+  };
+  localStorage.setItem(PRESET_STORAGE_KEY, JSON.stringify(existingPresets));
+};
+
+const loadPresetsFromStorage = (): Record<string, any> => {
+  try {
+    return JSON.parse(localStorage.getItem(PRESET_STORAGE_KEY) || '{}');
+  } catch {
+    return {};
+  }
+};
+
+const UniversalStrategyForm: React.FC<UniversalStrategyFormProps> = React.memo(({ 
   strategy, 
   baseStrategy, 
   onParameterChange 
 }) => {
   const [activeSection, setActiveSection] = useState('position_params');
+  const [savedPresets, setSavedPresets] = useState(loadPresetsFromStorage());
+  const [showPresets, setShowPresets] = useState(false);
+  const [presetName, setPresetName] = useState('');
   
-  const sections = createUniversalMapping(strategy, baseStrategy);
+  const sections = React.useMemo(() => 
+    createUniversalMapping(strategy, baseStrategy), 
+    [strategy, baseStrategy]
+  );
 
-  const handleFieldChange = (key: string, value: any) => {
-    onParameterChange(key, value);
+  // Debounced parameter change to prevent scan spam
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  
+  const handleFieldChange = useCallback((key: string, value: any) => {
+    // Clear existing timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    
+    // Set new timer for 350ms debounce (good balance for UX)
+    debounceTimerRef.current = setTimeout(() => {
+      onParameterChange(key, value);
+    }, 350);
+  }, [onParameterChange]);
+
+  // Cleanup timer on unmount
+  React.useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
+
+  // Preset management handlers
+  const handleSavePreset = () => {
+    if (!presetName.trim()) return;
+    savePresetToStorage(presetName, strategy.config_data);
+    setSavedPresets(loadPresetsFromStorage());
+    setPresetName('');
+    alert(`Preset "${presetName}" saved successfully!`);
+  };
+
+  const handleLoadPreset = (preset: any) => {
+    // Apply all preset parameters
+    Object.keys(preset.config_data || {}).forEach(key => {
+      const value = preset.config_data[key];
+      if (typeof value === 'object' && value !== null) {
+        // Handle nested objects
+        Object.keys(value).forEach(subKey => {
+          onParameterChange(`${key}.${subKey}`, value[subKey]);
+        });
+      } else {
+        onParameterChange(key, value);
+      }
+    });
+    setShowPresets(false);
   };
 
   const renderField = (field: UniversalFormField) => {
@@ -560,6 +632,72 @@ const UniversalStrategyForm: React.FC<UniversalStrategyFormProps> = ({
         )
       ))}
 
+      {/* Presets Controls */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Bookmark className="w-4 h-4" />
+            Parameter Presets
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Save Preset */}
+          <div className="flex gap-2">
+            <Input
+              placeholder="Enter preset name..."
+              value={presetName}
+              onChange={(e) => setPresetName(e.target.value)}
+              className="flex-1"
+            />
+            <Button onClick={handleSavePreset} disabled={!presetName.trim()} className="flex items-center gap-2">
+              <Save className="w-4 h-4" />
+              Save
+            </Button>
+          </div>
+
+          {/* Load Presets */}
+          <div className="space-y-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowPresets(!showPresets)}
+              className="flex items-center gap-2"
+            >
+              <Download className="w-4 h-4" />
+              Load Preset ({Object.keys(savedPresets).length} available)
+            </Button>
+            
+            {showPresets && Object.keys(savedPresets).length > 0 && (
+              <div className="border rounded-lg p-3 bg-gray-50 max-h-48 overflow-y-auto">
+                {Object.entries(savedPresets).map(([name, preset]: [string, any]) => (
+                  <div key={name} className="flex items-center justify-between py-2 border-b last:border-b-0">
+                    <div>
+                      <div className="font-medium">{name}</div>
+                      <div className="text-xs text-gray-500">
+                        {preset.strategy_type} • {new Date(preset.saved_at).toLocaleDateString()}
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleLoadPreset(preset)}
+                      className="text-xs"
+                    >
+                      Load
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            {showPresets && Object.keys(savedPresets).length === 0 && (
+              <div className="text-center py-4 text-gray-500">
+                No presets saved yet. Save your current parameters as a preset above.
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Strategy Summary */}
       <Card>
         <CardHeader>
@@ -596,6 +734,6 @@ const UniversalStrategyForm: React.FC<UniversalStrategyFormProps> = ({
       </Card>
     </div>
   );
-};
+});
 
 export default UniversalStrategyForm;
