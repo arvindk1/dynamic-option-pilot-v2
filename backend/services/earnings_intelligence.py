@@ -222,6 +222,18 @@ class EarningsIntelligenceService:
             "days_until": 1
         }
     
+    def get_earnings_proximity(self, symbol: str) -> Optional[int]:
+        """Get days until next earnings for a symbol. Returns None if no earnings within 7 days."""
+        try:
+            earnings_info = self._get_next_earnings_date(symbol)
+            if earnings_info and earnings_info.get('days_until') is not None:
+                days_until = earnings_info['days_until']
+                return days_until if days_until <= 7 else None
+            return None
+        except Exception as e:
+            logger.warning(f"Could not get earnings proximity for {symbol}: {e}")
+            return None
+    
     def get_sector_earnings_summary(self) -> Dict[str, Any]:
         """Get earnings summary by sector."""
         

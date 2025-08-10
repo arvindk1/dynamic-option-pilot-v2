@@ -254,12 +254,15 @@ async def lifespan(app: FastAPI):
             await plugin_registry.cleanup_all()
 
 
-# Create FastAPI app
+# Create FastAPI app with ORJson performance boost
+from fastapi.responses import ORJSONResponse
+
 app = FastAPI(
     title="Dynamic Option Pilot v2.0",
     description="Advanced Options Trading Platform with Plugin Architecture",
     version="2.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
+    default_response_class=ORJSONResponse  # 2-3x faster JSON responses
 )
 
 # Add CORS middleware
@@ -301,6 +304,115 @@ async def health_check():
     except Exception as e:
         logger.error(f"Health check failed: {e}")
         return {"status": "unhealthy", "error": str(e)}
+
+
+@app.get("/health/ready")
+async def health_ready():
+    """Enhanced health check for production readiness."""
+    services_status = {}
+    all_ready = True
+    
+    try:
+        # Check core components
+        services_status["plugin_registry"] = plugin_registry is not None
+        services_status["event_bus"] = event_bus is not None
+        services_status["opportunity_cache"] = opportunity_cache is not None
+        services_status["strategy_registry"] = strategy_registry is not None
+        
+        # Test database connectivity
+        try:
+            from models.database import get_db
+            db_gen = get_db()
+            db = next(db_gen)
+            db.execute("SELECT 1").fetchone()  # Quick connectivity test
+            services_status["database"] = True
+        except Exception as e:
+            services_status["database"] = False
+            all_ready = False
+            logger.warning(f"Database check failed: {e}")
+        
+        # Test cache service
+        try:
+            if opportunity_cache:
+                cache_stats = opportunity_cache.get_cache_stats()
+                services_status["cache"] = True
+            else:
+                services_status["cache"] = False
+                all_ready = False
+        except Exception as e:
+            services_status["cache"] = False
+            all_ready = False
+            logger.warning(f"Cache check failed: {e}")
+        
+        # Quick market data test
+        try:
+            if plugin_registry:
+                yf_provider = plugin_registry.get_plugin("yfinance_provider")
+                if yf_provider:
+                    test_data = await yf_provider.get_market_data("SPY")
+                    services_status["market_data"] = test_data is not None and test_data.get('price')
+                else:
+                    services_status["market_data"] = False
+                    all_ready = False
+            else:
+                services_status["market_data"] = False
+                all_ready = False
+        except Exception as e:
+            services_status["market_data"] = False
+            all_ready = False
+            logger.warning(f"Market data check failed: {e}")
+        
+        return {
+            "status": "ready" if all_ready else "not_ready",
+            "timestamp": datetime.utcnow().isoformat(),
+            "services": services_status,
+            "ready": all_ready
+        }
+        
+    except Exception as e:
+        logger.error(f"Readiness check failed: {e}")
+        return {
+            "status": "error",
+            "timestamp": datetime.utcnow().isoformat(),
+            "services": services_status,
+            "ready": False,
+            "error": str(e)
+        }
+
+
+@app.get("/api/debug/errors/recent")
+async def get_recent_errors(limit: int = 20, error_type: Optional[str] = None, service: Optional[str] = None):
+    """Quick error list endpoint for debugging - dev focused."""
+    try:
+        from services.error_logging_service import get_critical_errors
+        
+        errors = await get_critical_errors(
+            limit=limit,
+            error_type=error_type,
+            service=service,
+            since_hours=24  # Last 24 hours only
+        )
+        
+        return {
+            "total_count": len(errors),
+            "errors": errors,
+            "filters_applied": {
+                "limit": limit,
+                "error_type": error_type,
+                "service": service,
+                "since_hours": 24
+            },
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to fetch recent errors: {e}")
+        return {
+            "total_count": 0,
+            "errors": [],
+            "error": f"Failed to fetch errors: {str(e)}",
+            "timestamp": datetime.utcnow().isoformat()
+        }
 
 
 # System status endpoint
