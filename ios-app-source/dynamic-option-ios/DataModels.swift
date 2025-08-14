@@ -13,6 +13,23 @@ struct OpportunitiesResponse: Codable {
     let total_count: Int
 }
 
+// MARK: - Market Movers
+struct MoversResponse: Codable {
+    let gainers: [MoverStock]
+    let losers: [MoverStock]
+    let most_active: [MoverStock]
+}
+
+struct MoverStock: Codable, Identifiable, Hashable {
+    var id: String { symbol }
+    let symbol: String
+    let name: String
+    let price: Double
+    let change_percent: Double
+    let volume: Int
+}
+
+
 // MARK: - Opportunity Card
 struct OpportunityCard: Codable, Identifiable, Hashable {
     let id: String

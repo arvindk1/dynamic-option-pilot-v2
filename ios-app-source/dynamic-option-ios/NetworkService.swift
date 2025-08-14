@@ -85,4 +85,29 @@ class NetworkService: ObservableObject {
             throw NetworkError.requestFailed(error)
         }
     }
+    
+    // MARK: - Fetching Market Movers
+    
+    func fetchMovers() async throws -> MoversResponse {
+        guard let url = URL(string: "\(baseURL)/api/market/movers") else {
+            throw NetworkError.invalidURL
+        }
+        
+        do {
+            let (data, response) = try await URLSession.shared.data(from: url)
+            
+            guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+                throw NetworkError.invalidResponse
+            }
+            
+            do {
+                let decodedResponse = try JSONDecoder().decode(MoversResponse.self, from: data)
+                return decodedResponse
+            } catch {
+                throw NetworkError.decodingError(error)
+            }
+        } catch {
+            throw NetworkError.requestFailed(error)
+        }
+    }
 }
